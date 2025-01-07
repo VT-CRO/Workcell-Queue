@@ -1,0 +1,5 @@
+print-queue-backend/node_modules/
+print-queue-frontend/node_modules/
+print-queue-backend/botUuid.json
+print-queue-frontend/.env
+print-queue-backend/.env
