@@ -344,6 +344,8 @@ app.post('/:uuid/api/files/local',verifyGuildMembershipByUUID, upload.single('fi
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
+if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
 // Helper Functions
 
