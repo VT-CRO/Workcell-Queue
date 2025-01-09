@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "80:80" # Serve frontend on port 80
+    volumes:
+      - /app/build # No live updates needed in production
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "3000:3000" # Backend exposed on port 5000
+    env_file:
+      - ./backend/.env
+    restart: always
