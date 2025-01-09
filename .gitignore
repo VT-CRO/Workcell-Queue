@@ -1,5 +1,8 @@
-print-queue-backend/node_modules/
-print-queue-frontend/node_modules/
-print-queue-backend/botUuid.json
-print-queue-frontend/.env
-print-queue-backend/.env
+backend/node_modules/
+frontend/node_modules/
+backend/botUuid.json
+frontend/.env
+backend/.env
+backend/extracted_orca_printer/
+backend/outputs
+backend/verifiedUsers.json

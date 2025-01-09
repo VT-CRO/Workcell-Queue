@@ -537,6 +537,38 @@ app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), (req, res) => {
         }
       });
     });
+
+    app.post(`/${botUuid}/notify`, async (req, res) => {
+      const { message } = req.body;
+  
+      if (!message) {
+          return res.status(400).json({ message: 'Message is required' });
+      }
+  
+      try {
+          const response = await fetch(`${DISCORD_API_URL}/channels/${process.env.DISCORD_CHANNEL_ID}/messages`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  content: message,
+              }),
+          });
+  
+          if (!response.ok) {
+              const errorDetails = await response.text(); // Fetch error details
+              throw new Error(`Failed to send message: ${response.statusText} - ${errorDetails}`);
+          }
+  
+          res.status(200).json({ message: 'Notification sent successfully' });
+      } catch (error) {
+          console.error('Error sending notification:', error);
+          res.status(500).json({ message: 'Failed to send notification', error: error.message });
+      }
+  });
+  
   
 
 // // Handle 404 errors
