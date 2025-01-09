@@ -22,7 +22,7 @@ const MACHINE_NAME = "CRO Voron 2.4";
 const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer`);
 const EXTRACT_PATH = path.join(__dirname, 'extracted_orca_printer');
 const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
-const PRINTER_HOST = "http://localhost:3000";
+const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 
 // Paths
 const queueFilePath = path.join(__dirname, 'printQueue.json');
