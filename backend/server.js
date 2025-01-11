@@ -26,7 +26,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0"
+const VERSION = "1.0.1"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -389,6 +389,7 @@ const editFilament = (filePath) => {
 const editPrint = (filePath) => {
   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   data.brim_type="no_brim";
+  data.filename_format="{input_filename_base}_{filament_type[initial_tool]}_{print_time}.gcode";
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 };
 
