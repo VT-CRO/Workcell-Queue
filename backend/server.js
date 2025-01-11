@@ -25,6 +25,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
+const VERSION = "1.0"
 
 // Paths
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -217,7 +218,7 @@ app.use(session({
 }));
 
 // Root route
-app.get('/', (req, res) => res.send('Print Queue API is running'));
+app.get('/', (req, res) => res.send(`Print Queue API is running. Version: ${VERSION}`));
 
 // OAuth2 login
 app.get('/auth/login', (req, res) => {
