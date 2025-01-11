@@ -19,8 +19,6 @@ const __filename = fileURLToPath(import.meta.url);
 const DOCKER_PATH = process.env.DOCKER_MOUNT;
 const __dirname = path.join(path.dirname(__filename),DOCKER_PATH);
 
-console.log(`__dirname: ${__dirname}`);
-
 const MACHINE_NAME = "CRO Voron 2.4";
 const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer`);
 const EXTRACT_PATH = path.join(__dirname, 'extracted_orca_printer');
@@ -47,6 +45,7 @@ if (!fs.existsSync(verifiedUsersPath)) {
 if (fs.existsSync(botUuidFilePath)) {
   const data = fs.readFileSync(botUuidFilePath, 'utf-8');
   botUuid = JSON.parse(data).uuid;
+  console.log(`Bot UUID: ${botUuid}`);
 } else {
   botUuid = uuidv4();
   fs.writeFileSync(botUuidFilePath, JSON.stringify({ uuid: botUuid }, null, 2), 'utf-8');
