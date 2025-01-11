@@ -23,6 +23,8 @@ const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer
 const EXTRACT_PATH = path.join(__dirname, 'extracted_orca_printer');
 const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
+const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
+const DEFAULT_PROCESS = "0.20 Standard"
 
 // Paths
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -368,6 +370,22 @@ const editJsonFile = (filePath, authorName, id) => {
   }
 
   data.print_host = `${PRINTER_HOST}/${id}`;
+  data.inherits = "";
+  data.default_filament_profile = DEFAULT_FILAMENT;
+  data.default_print_profile = DEFAULT_PROCESS;
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+};
+
+// Edit the JSON file within the extracted `.orca_printer`
+const editFilament = (filePath) => {
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  data.compatible_printers=`${MACHINE_NAME}`;
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+};
+
+const editPrint = (filePath) => {
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  data.brim_type="no_brim";
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 };
 
@@ -411,6 +429,22 @@ app.get('/:uuid/api/download',verifyGuildMembershipByUUID, (req, res) => {
       return res.status(400).json({ message: `JSON file '${jsonFileToEdit}' not found.` });
     }
     editJsonFile(jsonFileToEdit, discordUser.id, uuid);
+
+    // Step 3: Edit the Filament file
+    const filamentPath = path.join(userExtractPath, 'filament');
+    const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
+    files.forEach((file) => {
+      const jsonFileToEdit = path.join(filamentPath, file);
+      editFilament(jsonFileToEdit);
+    });
+
+    // Step 4: Edit the Print file
+    const printPath = path.join(userExtractPath, 'process');
+    const printFiles = fs.readdirSync(printPath).filter(file => file.endsWith('.json'));
+    printFiles.forEach((file) => {
+      const jsonFileToEdit = path.join(printPath, file);
+      editPrint(jsonFileToEdit);
+    });
 
     // Step 3: Repackage the modified `.orca_printer` file
     repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
