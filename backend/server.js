@@ -16,7 +16,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const DOCKER_PATH = process.env.DOCKER_MOUNT;
+const __dirname = path.join(path.dirname(__filename),DOCKER_PATH);
+
+console.log(`__dirname: ${__dirname}`);
 
 const MACHINE_NAME = "CRO Voron 2.4";
 const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer`);
@@ -27,7 +30,7 @@ const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
 const VERSION = "1.0"
 
-// Paths
+// Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
 const verifiedUsersPath = path.join(__dirname, 'verifiedUsers.json');
 // Load or generate a UUID for the bot
@@ -72,7 +75,7 @@ const printQueue = loadQueue();
 
 // Multer configuration for uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
 });
 const upload = multer({ storage });
@@ -347,8 +350,8 @@ app.post('/:uuid/api/files/local',verifyGuildMembershipByUUID, upload.single('fi
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
-if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+if (!fs.existsSync(path.join(__dirname,'outputs'))) fs.mkdirSync(path.join(__dirname,'outputs'));
+if (!fs.existsSync(path.join(__dirname,'uploads'))) fs.mkdirSync(path.join(__dirname,'uploads'));
 
 // Helper Functions
 
@@ -396,6 +399,10 @@ const repackageOrcaPrinter = (sourceDir, outputFile) => {
   zipFile.addLocalFolder(sourceDir);
   zipFile.writeZip(outputFile);
 };
+
+app.get('/version', (req, res) => {
+  res.json({ version: VERSION });
+});
 
 // Download Route
 app.get('/:uuid/api/download',verifyGuildMembershipByUUID, (req, res) => {
