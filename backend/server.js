@@ -10,6 +10,13 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import zip from 'adm-zip'; // Ensure to install 'adm-zip' for handling zip files
+import admin from 'firebase-admin';
+
+admin.initializeApp({
+  credential: admin.credential.cert('workcell-98bc9-firebase-adminsdk-f29nz-e397a2869e.json'),
+});
+
+const db = admin.firestore();
 
 dotenv.config();
 
@@ -136,11 +143,22 @@ async function isUserInGuild(userId) {
     if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
   
     const verifiedUsers = loadVerifiedUsers();
-    const uuid = Object.keys(verifiedUsers).find((key) => verifiedUsers[key].id === req.session.user.id);
+    let uuid = 5;
+
+    db.collection('users').doc(req.session.user.id).get()
+    .then(doc => {
+      if (doc.exists) {
+        uuid = doc.data().uuid;
+        console.log(uuid);
+      }
+      else {
+        return res.status(403).json({ message: 'User not verified' });
+      }
+    })
+    .catch(error => {
+      console.error("Error getting document:", error);
+    });
   
-    if (!uuid) {
-      return res.status(403).json({ message: 'User not verified' });
-    }
   
     const isMember = await isUserInGuild(req.session.user.id);
   
@@ -224,7 +242,7 @@ app.get('/', (req, res) => res.send(`Print Queue API is running. Version: ${VERS
 
 // OAuth2 login
 app.get('/auth/login', (req, res) => {
-  const scope = 'identify';
+  const scope = 'identify+guilds+email';
   const authUrl = `${DISCORD_API_URL}/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI)}&response_type=code&scope=${scope}`;
   res.redirect(authUrl);
 });
@@ -258,17 +276,40 @@ app.get('/auth/callback', async (req, res) => {
 
     // Generate a UUID for the user
     const verifiedUsers = loadVerifiedUsers();
-    let userUUID = Object.keys(verifiedUsers).find((uuid) => verifiedUsers[uuid].id === userData.id);
+    let userUUID = 0;
 
-    if (!userUUID) {
-      userUUID = uuidv4(); // Generate a new UUID if not already stored
-      verifiedUsers[userUUID] = {
-        id: userData.id,
-        username: userData.username,
-        discriminator: userData.discriminator,
-      };
-      saveVerifiedUsers(verifiedUsers);
-    }
+    console.log("beforw");
+    
+    // store in database
+    db.collection('users').doc(userData.id).get()
+      .then(doc => {
+        if (doc.exists) {
+          userUUID = doc.data().uuid;
+          console.log("exists");
+        }
+        else {
+          console.log("doesnt");
+
+          userUUID = uuidv4(); // Generate a new UUID if not already stored
+          verifiedUsers[userUUID] = {
+            id: userData.id,
+            username: userData.username,
+            discriminator: userData.discriminator,
+          }
+          saveVerifiedUsers(verifiedUsers); 
+          const docRef = db.collection('users').doc(userData.id);
+
+          docRef.set({
+            username: userData.username,
+            email: userData.email,
+            uuid: userUUID,
+            totalPrintsQueued: 0
+          })
+        }
+      })
+      .catch(error => {
+        console.error("Error getting document:", error);
+      });
 
     userData.uuid = userUUID; // Attach the UUID to the user data
     req.session.user = userData;
