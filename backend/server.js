@@ -149,7 +149,6 @@ async function isUserInGuild(userId) {
     .then(doc => {
       if (doc.exists) {
         uuid = doc.data().uuid;
-        console.log(uuid);
       }
       else {
         return res.status(403).json({ message: 'User not verified' });
@@ -277,19 +276,14 @@ app.get('/auth/callback', async (req, res) => {
     // Generate a UUID for the user
     const verifiedUsers = loadVerifiedUsers();
     let userUUID = 0;
-
-    console.log("beforw");
     
     // store in database
     db.collection('users').doc(userData.id).get()
       .then(doc => {
         if (doc.exists) {
           userUUID = doc.data().uuid;
-          console.log("exists");
         }
         else {
-          console.log("doesnt");
-
           userUUID = uuidv4(); // Generate a new UUID if not already stored
           verifiedUsers[userUUID] = {
             id: userData.id,
