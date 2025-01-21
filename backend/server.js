@@ -12,19 +12,20 @@ import { fileURLToPath } from 'url';
 import zip from 'adm-zip'; // Ensure to install 'adm-zip' for handling zip files
 import admin from 'firebase-admin';
 
+dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const DOCKER_PATH = process.env.DOCKER_MOUNT;
+const __dirname = path.join(path.dirname(__filename),DOCKER_PATH);
+const FIREBASE_ADMIN = path.join(__dirname, process.env.FIREBASE_FILE);
+
 admin.initializeApp({
-  credential: admin.credential.cert('workcell-98bc9-firebase-adminsdk-f29nz-e397a2869e.json'),
+  credential: admin.credential.cert(FIREBASE_ADMIN),
 });
 
 const db = admin.firestore();
 
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-const __filename = fileURLToPath(import.meta.url);
-const DOCKER_PATH = process.env.DOCKER_MOUNT;
-const __dirname = path.join(path.dirname(__filename),DOCKER_PATH);
 
 const MACHINE_NAME = "CRO Voron 2.4";
 const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer`);
