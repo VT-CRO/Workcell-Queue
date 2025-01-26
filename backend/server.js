@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.5"
+const VERSION = "1.0.6"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -148,51 +148,26 @@ const verifyGuildMembership = async (req, res, next) => {
 
   const docRef = db.collection("users");
 
+  // remove user from firestore and log them out if not a member
+  if (!isMember) {
 
-  let user = null;
+    const docRef = db.collection("users").doc(req.session.user.id);
 
-  // Retrieve all documents
-  docRef.get()
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        // Check the value of the 'state' field
-        //console.log("Document ID: " + doc.data().uuid);
-        //console.log("Session ID: " + req.session.user.uuid);
-        if (doc.data().uuid === req.session.user.uuid) {
-          console.log(`Document ID: ${doc.id}, UUID: ${doc.data().uuid}`);
-          user = doc.data();
-          console.log(user);
-        }
+    docRef.delete()
+      .catch((error) => {
+        console.error("Error removing document: ", error);
       });
-      if (!isMember) {
 
-        // delete user in firestore --> still needs to be tested
-        const docRef = db.collection("users").doc(req.session.user.id);
-    
-        docRef.delete()
-          .catch((error) => {
-            console.error("Error removing document: ", error);
-          });
-    
-        req.session.destroy((err) => {
-          if (err) {
-            console.error('Error destroying session:', err);
-          }
-        });
-    
-        return res.status(403).json({ message: 'You are no longer a member of the server.' });
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
       }
-    
-      next(); // Proceed to the next middleware or route handler
-    })
-    .catch(error => {
-      console.error('Error getting documents:', error);
     });
 
+    return res.status(403).json({ message: 'You are no longer a member of the server.' });
+  }
 
-  //console.log(user);
-
-
+  next(); // Proceed to the next middleware or route handler
 };
 
 const verifyGuildMembershipByUUID = async (req, res, next) => {
