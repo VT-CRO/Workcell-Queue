@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.4"
+const VERSION = "1.0.5"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -169,7 +169,7 @@ const verifyGuildMembership = async (req, res, next) => {
         // delete user in firestore --> still needs to be tested
         const docRef = db.collection("users").doc(req.session.user.id);
     
-        deleteDoc(docRef)
+        docRef.delete()
           .catch((error) => {
             console.error("Error removing document: ", error);
           });
