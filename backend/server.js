@@ -160,12 +160,14 @@ const verifyGuildMembership = async (req, res, next) => {
         //console.log("Session ID: " + req.session.user.uuid);
         if (doc.data().uuid === req.session.user.uuid) {
           console.log(`Document ID: ${doc.id}, UUID: ${doc.data().uuid}`);
+          user = doc.data();
+          console.log(user);
         }
       });
       if (!isMember) {
 
         // delete user in firestore --> still needs to be tested
-        const docRef = doc(db, "users", req.session.user.id);
+        const docRef = db.doc("users", req.session.user.id);
     
         deleteDoc(docRef)
           .catch((error) => {
@@ -197,22 +199,32 @@ const verifyGuildMembershipByUUID = async (req, res, next) => {
   const { uuid } = req.params;
 
   // search firestore for uuid, check if user exists
-  const docRef = collection(db, "users");
+  const docRef = db.collection("users");
 
-  const q = query(docRef, where("uuid", "==", uuid));
 
   let user = null;
 
-  getDocs(q)
-    .then((snapshot) => {
-      snapshot.docs.forEach((doc) => {
-        console.log(doc.id, " => ", doc.data());
-        user = doc.uuid;
+  // Retrieve all documents
+  docRef.get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        if (doc.data().uuid === req.session.user.uuid) {
+          console.log(`Document ID: ${doc.id}, UUID: ${doc.data().uuid}`);
+          // set user
+          user = doc.data();
+          console.log(user);
+        }
       });
     })
-    .catch((error) => {
-      console.error("Error getting documents: ", error);
+    .catch(error => {
+      console.error('Error getting documents:', error);
     });
+
+
+
+
+
+
 
   if (!user) {
     return res.status(404).json({ message: 'User not found or not verified' });
