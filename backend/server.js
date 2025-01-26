@@ -15,7 +15,7 @@ import admin from 'firebase-admin';
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const DOCKER_PATH = process.env.DOCKER_MOUNT;
-const __dirname = path.join(path.dirname(__filename),DOCKER_PATH);
+const __dirname = path.join(path.dirname(__filename), DOCKER_PATH);
 const FIREBASE_ADMIN = path.join(__dirname, process.env.FIREBASE_FILE);
 
 admin.initializeApp({
@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.2"
+const VERSION = "1.0.3"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -97,114 +97,144 @@ const fetchDiscordUser = async (token) => {
 };
 
 function extractThumbnail(filePath) {
-    try {
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      const lines = fileContent.split('\n');
-      let isThumbnail = false;
-      let base64Data = '';
-  
-      lines.forEach((line) => {
-        if (line.includes('; THUMBNAIL_BLOCK_START')) {
-          isThumbnail = true;
-        } else if (line.includes('; THUMBNAIL_BLOCK_END')) {
-          isThumbnail = false;
-        } else if (isThumbnail && !line.startsWith('; thumbnail')) {
-          base64Data += line.trim().substring(2); // Remove leading `; `
-        }
-      });
-  
-      if (!base64Data) {
-        return null; // No thumbnail found
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const lines = fileContent.split('\n');
+    let isThumbnail = false;
+    let base64Data = '';
+
+    lines.forEach((line) => {
+      if (line.includes('; THUMBNAIL_BLOCK_START')) {
+        isThumbnail = true;
+      } else if (line.includes('; THUMBNAIL_BLOCK_END')) {
+        isThumbnail = false;
+      } else if (isThumbnail && !line.startsWith('; thumbnail')) {
+        base64Data += line.trim().substring(2); // Remove leading `; `
       }
-  
-      return base64Data;
-    } catch (error) {
-      console.error('Error extracting thumbnail:', error);
-      return null;
+    });
+
+    if (!base64Data) {
+      return null; // No thumbnail found
     }
+
+    return base64Data;
+  } catch (error) {
+    console.error('Error extracting thumbnail:', error);
+    return null;
   }
+}
 
 // Helper function to check if a user is in the server
 async function isUserInGuild(userId) {
-    try {
-      const response = await fetch(`https://discord.com/api/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`, {
-        headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`, // Use your Discord bot token
-        },
-      });
-  
-      return response.status === 200; // If the status is 200, the user is in the server
-    } catch (error) {
-      console.error('Error checking guild membership:', error);
-      return false;
-    }
+  try {
+    const response = await fetch(`https://discord.com/api/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`, {
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`, // Use your Discord bot token
+      },
+    });
+
+    return response.status === 200; // If the status is 200, the user is in the server
+  } catch (error) {
+    console.error('Error checking guild membership:', error);
+    return false;
   }
+}
 
-  const verifyGuildMembership = async (req, res, next) => {
-    if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
-  
-    const verifiedUsers = loadVerifiedUsers();
-    let uuid = 5;
+const verifyGuildMembership = async (req, res, next) => {
+  if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
-    db.collection('users').doc(req.session.user.id).get()
-    .then(doc => {
-      if (doc.exists) {
-        uuid = doc.data().uuid;
+  const isMember = await isUserInGuild(req.session.user.id);
+
+
+  const docRef = db.collection("users");
+
+
+  let user = null;
+
+  // Retrieve all documents
+  docRef.get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        // Check the value of the 'state' field
+        //console.log("Document ID: " + doc.data().uuid);
+        //console.log("Session ID: " + req.session.user.uuid);
+        if (doc.data().uuid === req.session.user.uuid) {
+          console.log(`Document ID: ${doc.id}, UUID: ${doc.data().uuid}`);
+        }
+      });
+      if (!isMember) {
+
+        // delete user in firestore --> still needs to be tested
+        const docRef = doc(db, "users", req.session.user.id);
+    
+        deleteDoc(docRef)
+          .catch((error) => {
+            console.error("Error removing document: ", error);
+          });
+    
+        req.session.destroy((err) => {
+          if (err) {
+            console.error('Error destroying session:', err);
+          }
+        });
+    
+        return res.status(403).json({ message: 'You are no longer a member of the server.' });
       }
-      else {
-        return res.status(403).json({ message: 'User not verified' });
-      }
+    
+      next(); // Proceed to the next middleware or route handler
     })
     .catch(error => {
-      console.error("Error getting document:", error);
+      console.error('Error getting documents:', error);
     });
-  
-  
-    const isMember = await isUserInGuild(req.session.user.id);
-  
+
+
+  //console.log(user);
+
+
+};
+
+const verifyGuildMembershipByUUID = async (req, res, next) => {
+  const { uuid } = req.params;
+
+  // search firestore for uuid, check if user exists
+  const docRef = collection(db, "users");
+
+  const q = query(docRef, where("uuid", "==", uuid));
+
+  let user = null;
+
+  getDocs(q)
+    .then((snapshot) => {
+      snapshot.docs.forEach((doc) => {
+        console.log(doc.id, " => ", doc.data());
+        user = doc.uuid;
+      });
+    })
+    .catch((error) => {
+      console.error("Error getting documents: ", error);
+    });
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found or not verified' });
+  }
+
+  try {
+    const isMember = await isUserInGuild(user.id);
+
     if (!isMember) {
       delete verifiedUsers[uuid];
       saveVerifiedUsers(verifiedUsers);
-  
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Error destroying session:', err);
-        }
-      });
-  
-      return res.status(403).json({ message: 'You are no longer a member of the server.' });
+
+      return res.status(403).json({ message: 'User is no longer a member of the server' });
     }
-  
+
     next(); // Proceed to the next middleware or route handler
-  };
-  
-  const verifyGuildMembershipByUUID = async (req, res, next) => {
-    const { uuid } = req.params;
-  
-    const verifiedUsers = loadVerifiedUsers();
-    const user = verifiedUsers[uuid];
-  
-    if (!user) {
-      return res.status(404).json({ message: 'User not found or not verified' });
-    }
-  
-    try {
-      const isMember = await isUserInGuild(user.id);
-  
-      if (!isMember) {
-        delete verifiedUsers[uuid];
-        saveVerifiedUsers(verifiedUsers);
-  
-        return res.status(403).json({ message: 'User is no longer a member of the server' });
-      }
-  
-      next(); // Proceed to the next middleware or route handler
-    } catch (error) {
-      console.error('Error verifying user:', error);
-      res.status(500).json({ message: 'Failed to verify user' });
-    }
-  };
-  
+  } catch (error) {
+    console.error('Error verifying user:', error);
+    res.status(500).json({ message: 'Failed to verify user' });
+  }
+};
+
 
 // CORS configuration
 app.use(cors({
@@ -221,9 +251,9 @@ app.use(express.json());
 
 // CORS configuration for open access
 const openCorsOptions = {
-    origin: '*', // Allow all origins
-    methods: ['GET'],
-  };
+  origin: '*', // Allow all origins
+  methods: ['GET'],
+};
 
 // Session configuration
 app.use(session({
@@ -277,7 +307,7 @@ app.get('/auth/callback', async (req, res) => {
     // Generate a UUID for the user
     const verifiedUsers = loadVerifiedUsers();
     let userUUID = 0;
-    
+
     // store in database
     db.collection('users').doc(userData.id).get()
       .then(doc => {
@@ -291,7 +321,7 @@ app.get('/auth/callback', async (req, res) => {
             username: userData.username,
             discriminator: userData.discriminator,
           }
-          saveVerifiedUsers(verifiedUsers); 
+          saveVerifiedUsers(verifiedUsers);
           const docRef = db.collection('users').doc(userData.id);
 
           docRef.set({
@@ -301,16 +331,19 @@ app.get('/auth/callback', async (req, res) => {
             totalPrintsQueued: 0
           })
         }
+
+        userData.uuid = userUUID; // Attach the UUID to the user data
+
+        req.session.user = userData;
+        // Redirect with the UUID (you could also provide it in the frontend)
+        res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
       })
       .catch(error => {
         console.error("Error getting document:", error);
       });
 
-    userData.uuid = userUUID; // Attach the UUID to the user data
-    req.session.user = userData;
 
-    // Redirect with the UUID (you could also provide it in the frontend)
-    res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+
   } catch (error) {
     console.error('Error during authentication:', error);
     res.status(500).send('Authentication failed');
@@ -318,75 +351,75 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 app.get('/queue/:id/thumbnail', (req, res) => {
-    const { id } = req.params;
-    const queueItem = printQueue.find((item) => item.id === id);
-  
-    if (!queueItem) {
-      return res.status(404).json({ message: 'File not found in the queue' });
-    }
-  
-    const filePath = path.join(__dirname, 'uploads', queueItem.filename);
-    const thumbnailBase64 = extractThumbnail(filePath);
-  
-    if (!thumbnailBase64) {
-      return res.status(404).json({ message: 'Thumbnail not found in the file' });
-    }
-  
-    res.json({ thumbnail: thumbnailBase64 });
-  });
-  
+  const { id } = req.params;
+  const queueItem = printQueue.find((item) => item.id === id);
+
+  if (!queueItem) {
+    return res.status(404).json({ message: 'File not found in the queue' });
+  }
+
+  const filePath = path.join(__dirname, 'uploads', queueItem.filename);
+  const thumbnailBase64 = extractThumbnail(filePath);
+
+  if (!thumbnailBase64) {
+    return res.status(404).json({ message: 'Thumbnail not found in the file' });
+  }
+
+  res.json({ thumbnail: thumbnailBase64 });
+});
+
 
 
 // Fake Octoprint Server
-app.get('/:uuid/api/version',verifyGuildMembershipByUUID, (req, res) => {
-    const { uuid } = req.params; // Extract the ID from the route
-    const verifiedUsers = loadVerifiedUsers();
+app.get('/:uuid/api/version', verifyGuildMembershipByUUID, (req, res) => {
+  const { uuid } = req.params; // Extract the ID from the route
+  const verifiedUsers = loadVerifiedUsers();
 
-    if (!verifiedUsers[uuid]) {
-        return res.status(403).json({ message: 'User is not authorized to upload files' });
-      }
-  
-    // Create the version info response
-    const versionInfo = {
-      server: "1.5.0",
-      api: "0.1",
-      text: "OctoPrint (Moonraker v0.3.1-12)",
-      uuid, // Include the dynamic ID in the response for context
-    };
-  
-    // Send the response as JSON
-    res.status(200).json(versionInfo);
-  });
+  if (!verifiedUsers[uuid]) {
+    return res.status(403).json({ message: 'User is not authorized to upload files' });
+  }
+
+  // Create the version info response
+  const versionInfo = {
+    server: "1.5.0",
+    api: "0.1",
+    text: "OctoPrint (Moonraker v0.3.1-12)",
+    uuid, // Include the dynamic ID in the response for context
+  };
+
+  // Send the response as JSON
+  res.status(200).json(versionInfo);
+});
 
 // Remote file upload by UUID
-app.post('/:uuid/api/files/local',verifyGuildMembershipByUUID, upload.single('file'), (req, res) => {
-    const { uuid } = req.params;
-    const verifiedUsers = loadVerifiedUsers();
-  
-    if (!verifiedUsers[uuid]) {
-      return res.status(403).json({ message: 'User is not authorized to upload files' });
-    }
-  
-    const file = req.file;
-    if (!file) return res.status(400).send('No file uploaded');
-  
-    const queueItem = {
-      id: uuidv4(),
-      filename: file.filename,
-      originalFilename: file.originalname,
-      uploader: verifiedUsers[uuid].username,
-      uploadedAt: new Date(),
-    };
-  
-    printQueue.push(queueItem);
-    saveQueue(printQueue);
-    res.status(200).json({ message: 'File uploaded successfully', queueItem });
-  });
+app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('file'), (req, res) => {
+  const { uuid } = req.params;
+  const verifiedUsers = loadVerifiedUsers();
+
+  if (!verifiedUsers[uuid]) {
+    return res.status(403).json({ message: 'User is not authorized to upload files' });
+  }
+
+  const file = req.file;
+  if (!file) return res.status(400).send('No file uploaded');
+
+  const queueItem = {
+    id: uuidv4(),
+    filename: file.filename,
+    originalFilename: file.originalname,
+    uploader: verifiedUsers[uuid].username,
+    uploadedAt: new Date(),
+  };
+
+  printQueue.push(queueItem);
+  saveQueue(printQueue);
+  res.status(200).json({ message: 'File uploaded successfully', queueItem });
+});
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
-if (!fs.existsSync(path.join(__dirname,'outputs'))) fs.mkdirSync(path.join(__dirname,'outputs'));
-if (!fs.existsSync(path.join(__dirname,'uploads'))) fs.mkdirSync(path.join(__dirname,'uploads'));
+if (!fs.existsSync(path.join(__dirname, 'outputs'))) fs.mkdirSync(path.join(__dirname, 'outputs'));
+if (!fs.existsSync(path.join(__dirname, 'uploads'))) fs.mkdirSync(path.join(__dirname, 'uploads'));
 
 // Helper Functions
 
@@ -418,14 +451,14 @@ const editJsonFile = (filePath, authorName, id) => {
 // Edit the JSON file within the extracted `.orca_printer`
 const editFilament = (filePath) => {
   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  data.compatible_printers=`${MACHINE_NAME}`;
+  data.compatible_printers = `${MACHINE_NAME}`;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 };
 
 const editPrint = (filePath) => {
   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  data.brim_type="no_brim";
-  data.filename_format="{input_filename_base}_{filament_type[initial_tool]}_{print_time}.gcode";
+  data.brim_type = "no_brim";
+  data.filename_format = "{input_filename_base}_{filament_type[initial_tool]}_{print_time}.gcode";
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 };
 
@@ -441,7 +474,7 @@ app.get('/version', (req, res) => {
 });
 
 // Download Route
-app.get('/:uuid/api/download',verifyGuildMembershipByUUID, (req, res) => {
+app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
   const { uuid } = req.params;
   const verifiedUsers = loadVerifiedUsers();
 
@@ -504,20 +537,20 @@ app.get('/:uuid/api/download',verifyGuildMembershipByUUID, (req, res) => {
 
 // Dashboard route
 app.get('/dashboard', verifyGuildMembership, (req, res) => {
-    if (!req.session.user) return res.status(401).send('Unauthorized');
-  
-    const verifiedUsers = loadVerifiedUsers();
-    const uuid = Object.keys(verifiedUsers).find((key) => verifiedUsers[key].id === req.session.user.id);
-  
-    if (!uuid) {
-      return res.status(403).json({ message: 'User not verified' });
-    }
-  
-    res.json({ username: req.session.user.username, uuid });
-  });
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+
+  const verifiedUsers = loadVerifiedUsers();
+  const uuid = Object.keys(verifiedUsers).find((key) => verifiedUsers[key].id === req.session.user.id);
+
+  if (!uuid) {
+    return res.status(403).json({ message: 'User not verified' });
+  }
+
+  res.json({ username: req.session.user.username, uuid });
+});
 
 // Upload G-Code
-app.post('/upload',verifyGuildMembership, upload.single('gcode'), (req, res) => {
+app.post('/upload', verifyGuildMembership, upload.single('gcode'), (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
 
   const file = req.file;
@@ -541,124 +574,125 @@ app.get('/queue', (req, res) => res.json(printQueue));
 
 // Delete queue item
 app.delete('/queue/:id', (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
-  
-    const { id } = req.params;
-  
-    // Find the item in the queue
-    const index = printQueue.findIndex((item) => item.id === id);
-    if (index === -1) return res.status(404).json({ message: 'Item not found' });
-  
-    const queueItem = printQueue[index];
-  
-    // Check if the current user is the uploader
-    if (queueItem.uploader !== req.session.user.username) {
-      return res.status(403).json({ message: 'You are not authorized to delete this file' });
+  if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
+
+  const { id } = req.params;
+
+  // Find the item in the queue
+  const index = printQueue.findIndex((item) => item.id === id);
+  if (index === -1) return res.status(404).json({ message: 'Item not found' });
+
+  const queueItem = printQueue[index];
+
+  // Check if the current user is the uploader
+  if (queueItem.uploader !== req.session.user.username) {
+    return res.status(403).json({ message: 'You are not authorized to delete this file' });
+  }
+
+  const filePath = path.join(__dirname, 'uploads', queueItem.filename);
+
+  // Delete the file
+  fs.unlink(filePath, (err) => {
+    if (err) {
+      console.error('Error deleting file:', err);
+      return res.status(500).json({ message: 'Failed to delete the file' });
     }
-  
-    const filePath = path.join(__dirname, 'uploads', queueItem.filename);
-  
-    // Delete the file
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error('Error deleting file:', err);
-        return res.status(500).json({ message: 'Failed to delete the file' });
-      }
-  
-      // Remove the item from the queue
-      const [deletedItem] = printQueue.splice(index, 1);
-      saveQueue(printQueue);
-      res.status(200).json({ message: 'Item and file deleted successfully', deletedItem });
-    });
-  });
 
-  app.post('/auth/logout', (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Error destroying session:', err);
-        return res.status(500).json({ message: 'Failed to log out' });
-      }
-      res.status(200).json({ message: 'Logged out successfully' });
-    });
+    // Remove the item from the queue
+    const [deletedItem] = printQueue.splice(index, 1);
+    saveQueue(printQueue);
+    res.status(200).json({ message: 'Item and file deleted successfully', deletedItem });
   });
-  
-  // Route to send the first .gcode file in the queue to any requester
+});
+
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+      return res.status(500).json({ message: 'Failed to log out' });
+    }
+    res.status(200).json({ message: 'Logged out successfully' });
+  });
+});
+
+// Route to send the first .gcode file in the queue to any requester
 app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), (req, res) => {
-    if (printQueue.length === 0) {
-        return res.status(404).json({ message: 'The queue is empty' });
-      }
-    
-      const firstQueueItem = printQueue[0];
-      const filePath = path.join(__dirname, 'uploads', firstQueueItem.filename);
-    
-      // Check if the file exists
-      if (!fs.existsSync(filePath)) {
-        return res.status(500).json({ message: 'File not found on the server' });
-      }
-    
-      // Set Content-Disposition header to suggest a filename for the client
-      res.setHeader('Content-Disposition', `attachment; filename="${firstQueueItem.originalFilename}"`);
-    
-      // Send the .gcode file
-      res.sendFile(filePath, (err) => {
+  if (printQueue.length === 0) {
+    return res.status(404).json({ message: 'The queue is empty' });
+  }
+
+  const firstQueueItem = printQueue[0];
+  const filePath = path.join(__dirname, 'uploads', firstQueueItem.filename);
+
+  // Check if the file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(500).json({ message: 'File not found on the server' });
+  }
+
+  // Set Content-Disposition header to suggest a filename for the client
+  res.setHeader('Content-Disposition', `attachment; filename="${firstQueueItem.originalFilename}"`);
+
+  // Send the .gcode file
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+      res.status(500).json({ message: 'Failed to send the file' });
+    } else {
+      // Remove the item from the queue
+      fs.unlink(filePath, (err) => {
         if (err) {
-          console.error('Error sending file:', err);
-          res.status(500).json({ message: 'Failed to send the file' });
-        } else {
-            // Remove the item from the queue
-            fs.unlink(filePath, (err) => {
-                if (err) {
-                  console.error('Error deleting file:', err);
-                  return res.status(500).json({ message: 'Failed to delete the file' });
-                }})
-            printQueue.shift();
-            saveQueue(printQueue);
-          console.log(`File sent: ${firstQueueItem.originalFilename}`);
+          console.error('Error deleting file:', err);
+          return res.status(500).json({ message: 'Failed to delete the file' });
         }
-      });
+      })
+      printQueue.shift();
+      saveQueue(printQueue);
+      console.log(`File sent: ${firstQueueItem.originalFilename}`);
+    }
+  });
+});
+
+app.post(`/${botUuid}/notify`, async (req, res) => {
+  const { message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ message: 'Message is required' });
+  }
+
+  try {
+    const response = await fetch(`${DISCORD_API_URL}/channels/${process.env.DISCORD_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: message,
+      }),
     });
 
-    app.post(`/${botUuid}/notify`, async (req, res) => {
-      const { message } = req.body;
-  
-      if (!message) {
-          return res.status(400).json({ message: 'Message is required' });
-      }
-  
-      try {
-          const response = await fetch(`${DISCORD_API_URL}/channels/${process.env.DISCORD_CHANNEL_ID}/messages`, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                  content: message,
-              }),
-          });
-  
-          if (!response.ok) {
-              const errorDetails = await response.text(); // Fetch error details
-              throw new Error(`Failed to send message: ${response.statusText} - ${errorDetails}`);
-          }
-  
-          res.status(200).json({ message: 'Notification sent successfully' });
-      } catch (error) {
-          console.error('Error sending notification:', error);
-          res.status(500).json({ message: 'Failed to send notification', error: error.message });
-      }
-  });
-  
-  
+    if (!response.ok) {
+      const errorDetails = await response.text(); // Fetch error details
+      throw new Error(`Failed to send message: ${response.statusText} - ${errorDetails}`);
+    }
+
+    res.status(200).json({ message: 'Notification sent successfully' });
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    res.status(500).json({ message: 'Failed to send notification', error: error.message });
+  }
+});
+
+
 
 // // Handle 404 errors
 // app.use((req, res) => res.status(404).send('Route not found'));
 
 // Log all requests
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-  });
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 
 // Start server
