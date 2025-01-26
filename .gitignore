@@ -6,3 +6,4 @@ backend/.env
 backend/extracted_orca_printer/
 backend/outputs
 backend/verifiedUsers.json
+backend/workcell-98bc9-firebase-adminsdk-f29nz-e397a2869e.json
