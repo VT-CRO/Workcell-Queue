@@ -34,20 +34,14 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.6"
+const VERSION = "1.0.7"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
-const verifiedUsersPath = path.join(__dirname, 'verifiedUsers.json');
 // Load or generate a UUID for the bot
 const botUuidFilePath = path.join(__dirname, 'botUuid.json');
 let botUuid;
 
-
-// Ensure verifiedUsers.json exists
-if (!fs.existsSync(verifiedUsersPath)) {
-  fs.writeFileSync(verifiedUsersPath, JSON.stringify({}), 'utf-8');
-}
 
 // Load the bot UUID if it exists, otherwise generate and save it
 if (fs.existsSync(botUuidFilePath)) {
@@ -59,10 +53,6 @@ if (fs.existsSync(botUuidFilePath)) {
   fs.writeFileSync(botUuidFilePath, JSON.stringify({ uuid: botUuid }, null, 2), 'utf-8');
   console.log(`Generated new bot UUID: ${botUuid}`);
 }
-
-// Load verified users
-const loadVerifiedUsers = () => JSON.parse(fs.readFileSync(verifiedUsersPath, 'utf-8'));
-const saveVerifiedUsers = (users) => fs.writeFileSync(verifiedUsersPath, JSON.stringify(users, null, 2), 'utf-8');
 
 // Discord configuration
 const DISCORD_API_URL = 'https://discord.com/api';
@@ -96,6 +86,7 @@ const fetchDiscordUser = async (token) => {
   return await response.json();
 };
 
+// extracts thumbnail from print file 
 function extractThumbnail(filePath) {
   try {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -140,13 +131,11 @@ async function isUserInGuild(userId) {
   }
 }
 
+// Middleware to verify guild membership
 const verifyGuildMembership = async (req, res, next) => {
   if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
   const isMember = await isUserInGuild(req.session.user.id);
-
-
-  const docRef = db.collection("users");
 
   // remove user from firestore and log them out if not a member
   if (!isMember) {
@@ -170,6 +159,7 @@ const verifyGuildMembership = async (req, res, next) => {
   next(); // Proceed to the next middleware or route handler
 };
 
+// Middleware to verify guild membership by UUID
 const verifyGuildMembershipByUUID = async (req, res, next) => {
   const { uuid } = req.params;
 
@@ -181,45 +171,48 @@ const verifyGuildMembershipByUUID = async (req, res, next) => {
 
   // Retrieve all documents
   docRef.get()
-    .then(snapshot => {
+    .then(async snapshot => {
       snapshot.forEach(doc => {
-        if (doc.data().uuid === req.session.user.uuid) {
-          console.log(`Document ID: ${doc.id}, UUID: ${doc.data().uuid}`);
+        if (doc.data().uuid === uuid) {
           // set user
           user = doc.data();
-          console.log(user);
         }
       });
+      if (!user) {
+        return res.status(404).json({ message: 'User not found or not verified' });
+      }
+
+      try {
+        const isMember = await isUserInGuild(user.id);
+
+        // remove user from firestore and log them out if not a member
+        if (!isMember) {
+
+          const docRef = db.collection("users").doc(user.id);
+
+          docRef.delete()
+            .catch((error) => {
+              console.error("Error removing document: ", error);
+            });
+
+          req.session.destroy((err) => {
+            if (err) {
+              console.error('Error destroying session:', err);
+            }
+          });
+
+          return res.status(403).json({ message: 'You are no longer a member of the server.' });
+        }
+
+        next(); // Proceed to the next middleware or route handler
+      } catch (error) {
+        console.error('Error verifying user:', error);
+        res.status(500).json({ message: 'Failed to verify user' });
+      }
     })
     .catch(error => {
       console.error('Error getting documents:', error);
     });
-
-
-
-
-
-
-
-  if (!user) {
-    return res.status(404).json({ message: 'User not found or not verified' });
-  }
-
-  try {
-    const isMember = await isUserInGuild(user.id);
-
-    if (!isMember) {
-      delete verifiedUsers[uuid];
-      saveVerifiedUsers(verifiedUsers);
-
-      return res.status(403).json({ message: 'User is no longer a member of the server' });
-    }
-
-    next(); // Proceed to the next middleware or route handler
-  } catch (error) {
-    console.error('Error verifying user:', error);
-    res.status(500).json({ message: 'Failed to verify user' });
-  }
 };
 
 
@@ -292,7 +285,6 @@ app.get('/auth/callback', async (req, res) => {
     if (!isMember) return res.status(403).send('You must be a member of the server.');
 
     // Generate a UUID for the user
-    const verifiedUsers = loadVerifiedUsers();
     let userUUID = 0;
 
     // store in database
@@ -303,12 +295,6 @@ app.get('/auth/callback', async (req, res) => {
         }
         else {
           userUUID = uuidv4(); // Generate a new UUID if not already stored
-          verifiedUsers[userUUID] = {
-            id: userData.id,
-            username: userData.username,
-            discriminator: userData.discriminator,
-          }
-          saveVerifiedUsers(verifiedUsers);
           const docRef = db.collection('users').doc(userData.id);
 
           docRef.set({
@@ -360,47 +346,77 @@ app.get('/queue/:id/thumbnail', (req, res) => {
 // Fake Octoprint Server
 app.get('/:uuid/api/version', verifyGuildMembershipByUUID, (req, res) => {
   const { uuid } = req.params; // Extract the ID from the route
-  const verifiedUsers = loadVerifiedUsers();
 
-  if (!verifiedUsers[uuid]) {
-    return res.status(403).json({ message: 'User is not authorized to upload files' });
-  }
 
-  // Create the version info response
-  const versionInfo = {
-    server: "1.5.0",
-    api: "0.1",
-    text: "OctoPrint (Moonraker v0.3.1-12)",
-    uuid, // Include the dynamic ID in the response for context
-  };
+  // search firestore for uuid, check if user exists
+  const docRef = db.collection("users");
 
-  // Send the response as JSON
-  res.status(200).json(versionInfo);
+
+  let user = null;
+
+  // Retrieve all documents
+  docRef.get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        if (doc.data().uuid === uuid) {
+          // set user
+          user = doc.data();
+        }
+      });
+      if (!user) {
+        return res.status(403).json({ message: 'User is not authorized to upload files' });
+      }
+      // Create the version info response
+      const versionInfo = {
+        server: "1.5.0",
+        api: "0.1",
+        text: "OctoPrint (Moonraker v0.3.1-12)",
+        uuid, // Include the dynamic ID in the response for context
+      };
+      // Send the response as JSON
+      res.status(200).json(versionInfo);
+    })
+    .catch(error => {
+      console.error('Error getting documents:', error);
+    });
+
 });
 
 // Remote file upload by UUID
 app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('file'), (req, res) => {
   const { uuid } = req.params;
-  const verifiedUsers = loadVerifiedUsers();
-
-  if (!verifiedUsers[uuid]) {
-    return res.status(403).json({ message: 'User is not authorized to upload files' });
-  }
 
   const file = req.file;
   if (!file) return res.status(400).send('No file uploaded');
 
-  const queueItem = {
-    id: uuidv4(),
-    filename: file.filename,
-    originalFilename: file.originalname,
-    uploader: verifiedUsers[uuid].username,
-    uploadedAt: new Date(),
-  };
+  let user = null;
+  // Retrieve all documents
+  docRef.get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        if (doc.data().uuid === uuid) {
+          // set user
+          user = doc.data();
+        }
+      });
+      if (!user) {
+        return res.status(403).json({ message: 'User is not authorized to upload files' });
+      }
+      const queueItem = {
+        id: uuidv4(),
+        filename: file.filename,
+        originalFilename: file.originalname,
+        uploader: user.username, // TODO fix this
+        uploadedAt: new Date(),
+      };
 
-  printQueue.push(queueItem);
-  saveQueue(printQueue);
-  res.status(200).json({ message: 'File uploaded successfully', queueItem });
+      printQueue.push(queueItem);
+      saveQueue(printQueue);
+      res.status(200).json({ message: 'File uploaded successfully', queueItem });
+    })
+    .catch(error => {
+      console.error('Error getting documents:', error);
+    });
 });
 
 // Ensure necessary directories exist
@@ -463,75 +479,81 @@ app.get('/version', (req, res) => {
 // Download Route
 app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
   const { uuid } = req.params;
-  const verifiedUsers = loadVerifiedUsers();
 
-  if (!verifiedUsers[uuid]) {
-    return res.status(403).json({ message: 'User is not authorized to download files' });
-  }
-
-  const discordUser = verifiedUsers[uuid];
-
-  if (!fs.existsSync(ORIGINAL_ORCA_PRINTER)) {
-    return res.status(400).json({ message: `Original file '${ORIGINAL_ORCA_PRINTER}' not found.` });
-  }
-
-  // Prepare paths for processing
-  const userExtractPath = path.join(EXTRACT_PATH, uuid);
-  const outputOrcaPrinter = path.join(OUTPUT_ORCA_PRINTER_DIR, `${uuid}.orca_printer`);
-
-  // Clean up previous data
-  if (fs.existsSync(userExtractPath)) fs.rmSync(userExtractPath, { recursive: true, force: true });
-  if (fs.existsSync(outputOrcaPrinter)) fs.unlinkSync(outputOrcaPrinter);
-
-  try {
-    // Step 1: Extract the original `.orca_printer` file
-    extractOrcaPrinter(ORIGINAL_ORCA_PRINTER, userExtractPath);
-
-    // Step 2: Edit the JSON file
-    const jsonFileToEdit = path.join(userExtractPath, 'printer', `${MACHINE_NAME}.json`);
-    if (!fs.existsSync(jsonFileToEdit)) {
-      return res.status(400).json({ message: `JSON file '${jsonFileToEdit}' not found.` });
-    }
-    editJsonFile(jsonFileToEdit, discordUser.id, uuid);
-
-    // Step 3: Edit the Filament file
-    const filamentPath = path.join(userExtractPath, 'filament');
-    const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
-    files.forEach((file) => {
-      const jsonFileToEdit = path.join(filamentPath, file);
-      editFilament(jsonFileToEdit);
+  // fix this TODO
+  
+  let user = null;
+  // Retrieve all documents
+  docRef.get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        if (doc.data().uuid === uuid) {
+          // set user
+          user = doc.data();
+        }
+      });
+      if (!user) {
+        return res.status(403).json({ message: 'User is not authorized to upload files' });
+      }
+      const discordUser = user;
+      if (!fs.existsSync(ORIGINAL_ORCA_PRINTER)) {
+        return res.status(400).json({ message: `Original file '${ORIGINAL_ORCA_PRINTER}' not found.` });
+      }
+    
+      // Prepare paths for processing
+      const userExtractPath = path.join(EXTRACT_PATH, uuid);
+      const outputOrcaPrinter = path.join(OUTPUT_ORCA_PRINTER_DIR, `${uuid}.orca_printer`);
+    
+      // Clean up previous data
+      if (fs.existsSync(userExtractPath)) fs.rmSync(userExtractPath, { recursive: true, force: true });
+      if (fs.existsSync(outputOrcaPrinter)) fs.unlinkSync(outputOrcaPrinter);
+    
+      try {
+        // Step 1: Extract the original `.orca_printer` file
+        extractOrcaPrinter(ORIGINAL_ORCA_PRINTER, userExtractPath);
+    
+        // Step 2: Edit the JSON file
+        const jsonFileToEdit = path.join(userExtractPath, 'printer', `${MACHINE_NAME}.json`);
+        if (!fs.existsSync(jsonFileToEdit)) {
+          return res.status(400).json({ message: `JSON file '${jsonFileToEdit}' not found.` });
+        }
+        editJsonFile(jsonFileToEdit, discordUser.id, uuid);
+    
+        // Step 3: Edit the Filament file
+        const filamentPath = path.join(userExtractPath, 'filament');
+        const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
+        files.forEach((file) => {
+          const jsonFileToEdit = path.join(filamentPath, file);
+          editFilament(jsonFileToEdit);
+        });
+    
+        // Step 4: Edit the Print file
+        const printPath = path.join(userExtractPath, 'process');
+        const printFiles = fs.readdirSync(printPath).filter(file => file.endsWith('.json'));
+        printFiles.forEach((file) => {
+          const jsonFileToEdit = path.join(printPath, file);
+          editPrint(jsonFileToEdit);
+        });
+    
+        // Step 3: Repackage the modified `.orca_printer` file
+        repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
+    
+        // Step 4: Serve the modified file
+        return res.download(outputOrcaPrinter, `${MACHINE_NAME}-${discordUser.username}.orca_printer`);
+      } catch (error) {
+        console.error('Error processing .orca_printer file:', error);
+        return res.status(500).json({ message: 'Failed to process the .orca_printer file.' });
+      }
+    })
+    .catch(error => {
+      console.error('Error getting documents:', error);
     });
-
-    // Step 4: Edit the Print file
-    const printPath = path.join(userExtractPath, 'process');
-    const printFiles = fs.readdirSync(printPath).filter(file => file.endsWith('.json'));
-    printFiles.forEach((file) => {
-      const jsonFileToEdit = path.join(printPath, file);
-      editPrint(jsonFileToEdit);
-    });
-
-    // Step 3: Repackage the modified `.orca_printer` file
-    repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
-
-    // Step 4: Serve the modified file
-    return res.download(outputOrcaPrinter, `${MACHINE_NAME}-${discordUser.username}.orca_printer`);
-  } catch (error) {
-    console.error('Error processing .orca_printer file:', error);
-    return res.status(500).json({ message: 'Failed to process the .orca_printer file.' });
-  }
 });
 
 
 // Dashboard route
 app.get('/dashboard', verifyGuildMembership, (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
-
-  const verifiedUsers = loadVerifiedUsers();
-  const uuid = Object.keys(verifiedUsers).find((key) => verifiedUsers[key].id === req.session.user.id);
-
-  if (!uuid) {
-    return res.status(403).json({ message: 'User not verified' });
-  }
 
   res.json({ username: req.session.user.username, uuid });
 });
