@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.7"
+const VERSION = "1.0.6 - The Reagan Version"
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -175,7 +175,7 @@ const verifyGuildMembershipByUUID = async (req, res, next) => {
       snapshot.forEach(doc => {
         if (doc.data().uuid === uuid) {
           // set user
-          user = doc.data();
+          user = doc.id;
         }
       });
       if (!user) {
@@ -183,12 +183,13 @@ const verifyGuildMembershipByUUID = async (req, res, next) => {
       }
 
       try {
-        const isMember = await isUserInGuild(user.id);
+
+        const isMember = await isUserInGuild(user);
 
         // remove user from firestore and log them out if not a member
         if (!isMember) {
 
-          const docRef = db.collection("users").doc(user.id);
+          const docRef = db.collection("users").doc(user);
 
           docRef.delete()
             .catch((error) => {
@@ -390,6 +391,8 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
   if (!file) return res.status(400).send('No file uploaded');
 
   let user = null;
+  const docRef = db.collection("users");
+
   // Retrieve all documents
   docRef.get()
     .then(snapshot => {
@@ -483,6 +486,8 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
   // fix this TODO
   
   let user = null;
+  const docRef = db.collection("users");
+
   // Retrieve all documents
   docRef.get()
     .then(snapshot => {
@@ -555,7 +560,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
 app.get('/dashboard', verifyGuildMembership, (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
 
-  res.json({ username: req.session.user.username, uuid });
+  res.json({ username: req.session.user.username, uuid: req.session.user.uuid });
 });
 
 // Upload G-Code
