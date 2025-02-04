@@ -704,11 +704,14 @@ app.get(`/check`, async (req, res) => {
   } else {
     res.status(503).json({ message: 'Queue Offline' });
   }
+  res.send(`Queue: ${ONLINE ? 'Online' : 'Offline'}`);
 });
 
 app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
   ONLINE = !ONLINE;
+  res.send(`Queue has been toggled to: ${ONLINE ? 'Online' : 'Offline'}`);
   res.status(200).json({ message: 'Queue Toggled' });
+  
 });
 
 // // Handle 404 errors
