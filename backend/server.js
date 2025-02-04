@@ -700,18 +700,15 @@ app.post(`/${botUuid}/notify`, async (req, res) => {
 
 app.get(`/check`, async (req, res) => {
   if (ONLINE) {
-    res.status(200).json({ message: 'Queue Online' });
+    res.status(200).send(`Queue Status: ${ONLINE ? 'Online' : 'Offline'}`);
   } else {
-    res.status(503).json({ message: 'Queue Offline' });
+    res.status(503).send(`Queue Status: ${ONLINE ? 'Online' : 'Offline'}`);
   }
-  res.send(`Queue: ${ONLINE ? 'Online' : 'Offline'}`);
 });
 
 app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
   ONLINE = !ONLINE;
-  res.send(`Queue has been toggled to: ${ONLINE ? 'Online' : 'Offline'}`);
-  res.status(200).json({ message: 'Queue Toggled' });
-  
+  res.status(200).send(`Queue Toggled: ${ONLINE ? 'Online' : 'Offline'}`);
 });
 
 // // Handle 404 errors
