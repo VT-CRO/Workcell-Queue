@@ -34,7 +34,8 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.6 - The Reagan Version"
+const VERSION = "1.0.8 - Nimbus"
+let ONLINE = false;
 
 // Path
 const queueFilePath = path.join(__dirname, 'printQueue.json');
@@ -697,7 +698,18 @@ app.post(`/${botUuid}/notify`, async (req, res) => {
   }
 });
 
+app.get(`/${botUuid}/check`, async (req, res) => {
+  if (ONLINE) {
+    res.status(200).json({ message: 'Queue Online' });
+  } else {
+    res.status(503).json({ message: 'Queue Offline' });
+  }
+});
 
+app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
+  ONLINE = !ONLINE;
+  res.status(200).json({ message: 'Queue Toggled' });
+});
 
 // // Handle 404 errors
 // app.use((req, res) => res.status(404).send('Route not found'));
