@@ -698,7 +698,7 @@ app.post(`/${botUuid}/notify`, async (req, res) => {
   }
 });
 
-app.get(`/${botUuid}/check`, async (req, res) => {
+app.get(`/check`, async (req, res) => {
   if (ONLINE) {
     res.status(200).json({ message: 'Queue Online' });
   } else {
