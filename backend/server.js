@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.0 - Aurora"
+const VERSION = "1.1.1 - Aurora"
 let ONLINE = false;
 
 // Path
@@ -76,7 +76,18 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
 });
-const upload = multer({ storage });
+
+const fileFilter = (req, file, cb) => {
+  // Check if the file has a .gcode extension
+  if (path.extname(file.originalname).toLowerCase() === '.gcode') {
+    cb(null, true); // Accept the file
+  } else {
+    cb(new Error('Only .gcode files are allowed'), false); // Reject the file
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
 
 // Helper function to fetch Discord user data
 const fetchDiscordUser = async (token) => {
@@ -457,6 +468,14 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
   }
 });
 
+// Error handling middleware for Multer
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message === 'Only .gcode files are allowed') {
+    return res.status(400).json({ message: err.message });
+  }
+  next(err);
+});
+
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
@@ -621,7 +640,6 @@ app.get('/dashboard', verifyGuildMembership, async (req, res) => {
 });
 
 
-/// Upload G-Code
 app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
 
@@ -658,8 +676,6 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
     res.status(500).send('Internal Server Error');
   }
 });
-
-
 
 // Get print queue
 app.get('/queue', (req, res) => res.json(printQueue));
