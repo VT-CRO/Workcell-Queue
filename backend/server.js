@@ -444,6 +444,7 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
       filename: file.filename,
       originalFilename: file.originalname,
       uploader: uploader, // Use the nickname or username
+      originalUploader: userData.id,
       uploadedAt: new Date(),
     };
 
@@ -645,6 +646,7 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
       filename: file.filename,
       originalFilename: file.originalname,
       uploader: uploader, // Use the nickname or username
+      originalUploader: userData.id,
       uploadedAt: new Date(),
     };
 
@@ -666,6 +668,7 @@ app.get('/queue', (req, res) => res.json(printQueue));
 app.delete('/queue/:id', (req, res) => {
   if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
+
   const { id } = req.params;
 
   // Find the item in the queue
@@ -675,7 +678,7 @@ app.delete('/queue/:id', (req, res) => {
   const queueItem = printQueue[index];
 
   // Check if the current user is the uploader
-  if (queueItem.uploader !== req.session.user.username) {
+  if (queueItem.originalUploader !== req.session.user.id) {
     return res.status(403).json({ message: 'You are not authorized to delete this file' });
   }
 
