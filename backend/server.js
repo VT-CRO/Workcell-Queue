@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.1 - Aurora"
+const VERSION = "1.1.2 - Aurora"
 let ONLINE = false;
 
 // Path
@@ -468,14 +468,16 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
   }
 });
 
-// Error handling middleware for Multer
+// Error handling middleware for Multer and other errors
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || err.message === 'Only .gcode files are allowed') {
-    return res.status(400).json({ message: err.message });
+    return res.status(400).json({ message: err.message }); // Ensure JSON response
   }
-  next(err);
-});
 
+  // Handle other errors
+  console.error('Unhandled error:', err);
+  res.status(500).json({ message: 'Internal Server Error' });
+});
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
@@ -675,6 +677,17 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
     console.error('Error fetching user data from Firebase:', error);
     res.status(500).send('Internal Server Error');
   }
+});
+
+// Error handling middleware for Multer and other errors
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message === 'Only .gcode files are allowed') {
+    return res.status(400).json({ message: err.message }); // Ensure JSON response
+  }
+
+  // Handle other errors
+  console.error('Unhandled error:', err);
+  res.status(500).json({ message: 'Internal Server Error' });
 });
 
 // Get print queue

@@ -30,10 +30,13 @@ const UploadSection = ({ refreshQueue }) => {
       });
 
       if (!response.ok) {
+        // Extract the error message from the response
         const errorData = await response.json();
         setError(errorData.message || 'Failed to upload the file');
         return;
       }
+
+      const data = await response.json();
       refreshQueue(); // Refresh the queue after successful upload
       setFile(null); // Clear the file input
       document.querySelector('input[type="file"]').value = ''; // Reset the file input field
