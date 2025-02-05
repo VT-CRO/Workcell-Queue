@@ -35,27 +35,41 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
       {queue.length > 0 ? (
         <ul>
           {queue.map((item) => (
-            <li key={item.id} className="mb-2 flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                {/* Thumbnail */}
-                <Thumbnail queueItemId={item.id} backendUrl={backendUrl} />
+            <li key={item.id} className="mb-4 flex items-center">
+              {/* Thumbnail */}
+              <Thumbnail queueItemId={item.id} backendUrl={backendUrl} />
 
-                {/* File details */}
-                <span>
-                  {item.originalFilename} - Uploaded by {item.uploader}
+              {/* File details */}
+              <div className="ml-4 flex flex-col">
+                <div className="flex items-center">
+                  {/* File name */}
+                  <span
+                    className="font-medium"
+                    style={{ color: '#000000' }} // Black text for filename
+                  >
+                    {item.originalFilename}
+                  </span>
+
+                  {/* Trash can icon */}
+                  {(item.uploader === user.username || item.uploader === user.nickname) && (
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="text-red-500 hover:text-red-700 ml-2"
+                      aria-label="Delete"
+                    >
+                      <FaTrash />
+                    </button>
+                  )}
+                </div>
+
+                {/* Uploader details */}
+                <span
+                  className="text-sm"
+                  style={{ color: '#444444' }} // Dark gray text for uploader
+                >
+                  By {item.uploader}
                 </span>
               </div>
-
-              {/* Delete button for uploader */}
-              {(item.uploader === user.username || item.uploader === user.nickname) && (
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="text-red-500 hover:text-red-700"
-                  aria-label="Delete"
-                >
-                  <FaTrash />
-                </button>
-              )}
             </li>
           ))}
         </ul>

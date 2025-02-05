@@ -70,13 +70,13 @@ const Header = () => {
   return (
     <header className="bg-gray-800 text-white py-4 px-6 flex justify-between items-center">
       <h1 className="text-2xl font-bold">
-      <Link to="/" className="flex items-center">
-            <img
-              src="/VT_CRO_Logo_with_Text.png"
-              alt="Logo"
-              className="ml-2 object-contain h-10" // Adjust height and maintain aspect ratio
-            />
-          </Link>
+        <Link to="/" className="flex items-center">
+          <img
+            src="/VT_CRO_Logo_with_Text.png"
+            alt="Logo"
+            className="ml-2 object-contain h-12" // Increased height from 10 to 12
+          />
+        </Link>
       </h1>
       <div className="flex items-center space-x-4">
         {user ? (
@@ -85,6 +85,7 @@ const Header = () => {
               <button
                 onClick={toggleDropdown}
                 className="text-white font-bold py-2 px-4 rounded hover:bg-gray-700 flex items-center"
+                style={{ paddingRight: '8px' }} // Reduced right padding
               >
                 <img
                   src={getAvatarUrl(user, guildAvatar)}

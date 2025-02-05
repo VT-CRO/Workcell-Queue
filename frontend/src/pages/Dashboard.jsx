@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import UploadSection from '../components/UploadSection';
 import PrintQueue from '../components/PrintQueue';
+
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
-  const [nickname, setNickname] = useState(null); // State for server-specific nickname
   const [queue, setQueue] = useState([]);
   const [error, setError] = useState(null); // Error handling
 
@@ -25,7 +25,6 @@ const Dashboard = () => {
       .then((data) => {
         setUser(data); // Set the full user object
         setError(null); // Clear any existing error
-        setNickname(data.nickname); // Set server-specific nickname
       })
       .catch((err) => {
         console.error(err);
@@ -61,26 +60,21 @@ const Dashboard = () => {
     }
   };
 
-  const getDisplayName = (user, nickname) => {
-    return nickname || user.username; // Use nickname if it exists, otherwise fallback to username
-  };
-
   return (
-    <section className="container mx-auto p-8">
+    <section className="container mx-auto p-8 pt-10">
       <h2 className="text-3xl font-bold mb-4">Dashboard</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {user ? (
         <>
-          <p className="mb-4">Welcome, {getDisplayName(user, nickname)}</p> {/* Render username */}
+          {/* Updated Download Configuration Button */}
           <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4"
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-md transition-all duration-200 flex items-center mb-10" // Added 80px of margin below
             onClick={handleDownload}
           >
             Download Configuration
           </button>
           <UploadSection refreshQueue={fetchQueue} />
           <PrintQueue queue={queue} refreshQueue={fetchQueue} user={user} />
-
         </>
       ) : (
         <p>You must log in to access this page.</p>
