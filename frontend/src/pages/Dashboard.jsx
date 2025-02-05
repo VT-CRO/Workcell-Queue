@@ -5,6 +5,7 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
+  const [nickname, setNickname] = useState(null); // State for server-specific nickname
   const [queue, setQueue] = useState([]);
   const [error, setError] = useState(null); // Error handling
 
@@ -24,6 +25,7 @@ const Dashboard = () => {
       .then((data) => {
         setUser(data); // Set the full user object
         setError(null); // Clear any existing error
+        setNickname(data.nickname); // Set server-specific nickname
       })
       .catch((err) => {
         console.error(err);
@@ -59,13 +61,17 @@ const Dashboard = () => {
     }
   };
 
+  const getDisplayName = (user, nickname) => {
+    return nickname || user.username; // Use nickname if it exists, otherwise fallback to username
+  };
+
   return (
     <section className="container mx-auto p-8">
       <h2 className="text-3xl font-bold mb-4">Dashboard</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {user ? (
         <>
-          <p className="mb-4">Welcome, {user.username}</p> {/* Render username */}
+          <p className="mb-4">Welcome, {getDisplayName(user, nickname)}</p> {/* Render username */}
           <button
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4"
             onClick={handleDownload}

@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.0.8 - Nimbus"
+const VERSION = "1.1.0 - Aurora"
 let ONLINE = false;
 
 // Path
@@ -138,15 +138,13 @@ const verifyGuildMembership = async (req, res, next) => {
 
   const isMember = await isUserInGuild(req.session.user.id);
 
-  // remove user from firestore and log them out if not a member
   if (!isMember) {
+    // Remove user from Firestore and log them out if not a member
+    const docRef = db.collection('users').doc(req.session.user.id);
 
-    const docRef = db.collection("users").doc(req.session.user.id);
-
-    docRef.delete()
-      .catch((error) => {
-        console.error("Error removing document: ", error);
-      });
+    docRef.delete().catch((error) => {
+      console.error('Error removing document: ', error);
+    });
 
     req.session.destroy((err) => {
       if (err) {
@@ -157,8 +155,43 @@ const verifyGuildMembership = async (req, res, next) => {
     return res.status(403).json({ message: 'You are no longer a member of the server.' });
   }
 
-  next(); // Proceed to the next middleware or route handler
+  try {
+    // Fetch the guild member data from Discord's API
+    const response = await fetch(
+      `${DISCORD_API_URL}/guilds/${DISCORD_GUILD_ID}/members/${req.session.user.id}`,
+      {
+        headers: {
+          Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Failed to fetch guild member data:', response.statusText);
+      return res.status(500).send('Failed to fetch guild member data');
+    }
+
+    const guildMember = await response.json();
+
+    // Store the user's data in Firebase
+    const userData = {
+      username: req.session.user.username,
+      nickname: guildMember.nick || null, // Store the server-specific nickname
+      avatar: req.session.user.avatar,
+      id: req.session.user.id,
+      discriminator: req.session.user.discriminator,
+      uuid: req.session.user.uuid,
+    };
+
+    await db.collection('users').doc(req.session.user.id).set(userData, { merge: true });
+
+    next();
+  } catch (error) {
+    console.error('Error verifying guild membership:', error);
+    res.status(500).send('Internal Server Error');
+  }
 };
+
 
 // Middleware to verify guild membership by UUID
 const verifyGuildMembershipByUUID = async (req, res, next) => {
@@ -385,43 +418,44 @@ app.get('/:uuid/api/version', verifyGuildMembershipByUUID, (req, res) => {
 });
 
 // Remote file upload by UUID
-app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('file'), (req, res) => {
+app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('file'), async (req, res) => {
   const { uuid } = req.params;
 
   const file = req.file;
   if (!file) return res.status(400).send('No file uploaded');
 
-  let user = null;
-  const docRef = db.collection("users");
+  try {
+    // Fetch the user's data from Firebase using their UUID
+    const userSnapshot = await db.collection('users').where('uuid', '==', uuid).get();
 
-  // Retrieve all documents
-  docRef.get()
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        if (doc.data().uuid === uuid) {
-          // set user
-          user = doc.data();
-        }
-      });
-      if (!user) {
-        return res.status(403).json({ message: 'User is not authorized to upload files' });
-      }
-      const queueItem = {
-        id: uuidv4(),
-        filename: file.filename,
-        originalFilename: file.originalname,
-        uploader: user.username, // TODO fix this
-        uploadedAt: new Date(),
-      };
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: 'User not found in the database' });
+    }
 
-      printQueue.push(queueItem);
-      saveQueue(printQueue);
-      res.status(200).json({ message: 'File uploaded successfully', queueItem });
-    })
-    .catch(error => {
-      console.error('Error getting documents:', error);
-    });
+    // Extract the user data (assuming UUIDs are unique, so there will only be one document)
+    const userDoc = userSnapshot.docs[0];
+    const userData = userDoc.data();
+
+    // Use the server-specific nickname if it exists, otherwise fallback to the username
+    const uploader = userData.nickname || userData.username;
+
+    const queueItem = {
+      id: uuidv4(),
+      filename: file.filename,
+      originalFilename: file.originalname,
+      uploader: uploader, // Use the nickname or username
+      uploadedAt: new Date(),
+    };
+
+    printQueue.push(queueItem);
+    saveQueue(printQueue);
+    res.status(200).json({ message: 'File uploaded successfully', queueItem });
+  } catch (error) {
+    console.error('Error fetching user data from Firebase:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
+
 
 // Ensure necessary directories exist
 if (!fs.existsSync(OUTPUT_ORCA_PRINTER_DIR)) fs.mkdirSync(OUTPUT_ORCA_PRINTER_DIR);
@@ -557,32 +591,73 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
 });
 
 
-// Dashboard route
-app.get('/dashboard', verifyGuildMembership, (req, res) => {
+app.get('/dashboard', verifyGuildMembership, async (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
 
-  res.json({ username: req.session.user.username, uuid: req.session.user.uuid });
+  try {
+    // Fetch the user's data from Firebase using their Discord ID
+    const userDoc = await db.collection('users').doc(req.session.user.id).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ message: 'User not found in the database' });
+    }
+
+    const userData = userDoc.data();
+
+    // Respond with user data, including the nickname stored in Firebase
+    res.json({
+      username: userData.username,
+      uuid: userData.uuid,
+      avatar: userData.avatar,
+      id: userData.id,
+      discriminator: userData.discriminator,
+      nickname: userData.nickname || null, // Include the server-specific nickname
+    });
+  } catch (error) {
+    console.error('Error fetching user data from Firebase:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
-// Upload G-Code
-app.post('/upload', verifyGuildMembership, upload.single('gcode'), (req, res) => {
+
+/// Upload G-Code
+app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, res) => {
   if (!req.session.user) return res.status(401).send('Unauthorized');
 
   const file = req.file;
   if (!file) return res.status(400).send('No file uploaded');
 
-  const queueItem = {
-    id: uuidv4(),
-    filename: file.filename,
-    originalFilename: file.originalname,
-    uploader: req.session.user.username,
-    uploadedAt: new Date(),
-  };
+  try {
+    // Fetch the user's data from Firebase using their UUID
+    const userDoc = await db.collection('users').doc(req.session.user.id).get();
 
-  printQueue.push(queueItem);
-  saveQueue(printQueue);
-  res.status(200).json({ message: 'File uploaded successfully', queueItem });
+    if (!userDoc.exists) {
+      return res.status(404).json({ message: 'User not found in the database' });
+    }
+
+    const userData = userDoc.data();
+
+    // Use the server-specific nickname if it exists, otherwise fallback to the username
+    const uploader = userData.nickname || userData.username;
+
+    const queueItem = {
+      id: uuidv4(),
+      filename: file.filename,
+      originalFilename: file.originalname,
+      uploader: uploader, // Use the nickname or username
+      uploadedAt: new Date(),
+    };
+
+    printQueue.push(queueItem);
+    saveQueue(printQueue);
+    res.status(200).json({ message: 'File uploaded successfully', queueItem });
+  } catch (error) {
+    console.error('Error fetching user data from Firebase:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
+
+
 
 // Get print queue
 app.get('/queue', (req, res) => res.json(printQueue));

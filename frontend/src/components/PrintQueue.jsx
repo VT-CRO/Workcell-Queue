@@ -47,7 +47,7 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
               </div>
 
               {/* Delete button for uploader */}
-              {item.uploader === user.username && (
+              {(item.uploader === user.username || item.uploader === user.nickname) && (
                 <button
                   onClick={() => handleDelete(item.id)}
                   className="text-red-500 hover:text-red-700"
@@ -79,6 +79,7 @@ PrintQueue.propTypes = {
   refreshQueue: PropTypes.func.isRequired,
   user: PropTypes.shape({
     username: PropTypes.string.isRequired,
+    nickname: PropTypes.string, // Add nickname as optional
   }).isRequired,
 };
 

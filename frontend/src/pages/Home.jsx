@@ -26,7 +26,7 @@ const Home = () => {
 
   return (
     <section className="container mx-auto p-8 text-center">
-      <h2 className="text-4xl font-bold mb-4">Welcome to the Print Queue System</h2>
+      <h2 className="text-4xl font-bold mb-4">Welcome to VT CRO's 3D-printing queue</h2>
       <p className="mb-6 text-lg">
         Log in with Discord to upload your G-code files and manage the print queue.
       </p>
