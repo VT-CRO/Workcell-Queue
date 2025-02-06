@@ -72,7 +72,7 @@ const Header = () => {
       <h1 className="text-2xl font-bold">
       <Link to="/" className="flex items-center">
             <img
-              src="https://n21bs7xowo.ufs.sh/f/k2EZSuqLb2MWM4RYZIozRQhl0rWusFf7wbKNYOaH1dVDS5zX"
+              src="/VT_CRO_Logo_with_Text.png"
               alt="Logo"
               className="ml-2 object-contain h-10" // Adjust height and maintain aspect ratio
             />
