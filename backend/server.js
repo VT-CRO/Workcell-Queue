@@ -37,8 +37,6 @@ const DEFAULT_PROCESS = "0.20 Standard"
 const VERSION = "1.1.2 - Aurora"
 let ONLINE = false;
 
-// Path
-const queueFilePath = path.join(__dirname, 'printQueue.json');
 // Load or generate a UUID for the bot
 const botUuidFilePath = path.join(__dirname, 'botUuid.json');
 let botUuid;
@@ -65,11 +63,6 @@ if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !pro
   console.error('Missing required environment variables');
   process.exit(1);
 }
-
-// Load print queue
-const loadQueue = () => (fs.existsSync(queueFilePath) ? JSON.parse(fs.readFileSync(queueFilePath, 'utf-8')) : []);
-const saveQueue = (queue) => fs.writeFileSync(queueFilePath, JSON.stringify(queue, null, 2), 'utf-8');
-const printQueue = loadQueue();
 
 // Multer configuration for uploads
 const storage = multer.diskStorage({
@@ -369,9 +362,12 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-app.get('/queue/:id/thumbnail', (req, res) => {
+app.get('/queue/:id/thumbnail', async (req, res) => {
   const { id } = req.params;
-  const queueItem = printQueue.find((item) => item.id === id);
+
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const queueItem = queueItemSearch.docs[0].data();
+  
 
   if (!queueItem) {
     return res.status(404).json({ message: 'File not found in the queue' });
@@ -459,8 +455,8 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
       uploadedAt: new Date(),
     };
 
-    printQueue.push(queueItem);
-    saveQueue(printQueue);
+    await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
+    
     res.status(200).json({ message: 'File uploaded successfully', queueItem });
   } catch (error) {
     console.error('Error fetching user data from Firebase:', error);
@@ -667,11 +663,11 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
       originalFilename: file.originalname,
       uploader: uploader, // Use the nickname or username
       originalUploader: userData.id,
-      uploadedAt: new Date(),
+      uploadedAt: new Date()
     };
 
-    printQueue.push(queueItem);
-    saveQueue(printQueue);
+    await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
+
     res.status(200).json({ message: 'File uploaded successfully', queueItem });
   } catch (error) {
     console.error('Error fetching user data from Firebase:', error);
@@ -691,39 +687,50 @@ app.use((err, req, res, next) => {
 });
 
 // Get print queue
-app.get('/queue', (req, res) => res.json(printQueue));
+app.get('/queue', async (req, res) => {
+  const queueRef = await db.collection('queue').orderBy("uploadedAt").get();
+
+  let docs = [];
+  queueRef.forEach((doc) => {
+    docs.push({...doc.data() });
+  });
+
+  res.json(docs);
+})
 
 // Delete queue item
-app.delete('/queue/:id', (req, res) => {
+app.delete('/queue/:id', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
 
   const { id } = req.params;
 
   // Find the item in the queue
-  const index = printQueue.findIndex((item) => item.id === id);
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const index = queueItemSearch.docs[0].data();
+
+
+
   if (index === -1) return res.status(404).json({ message: 'Item not found' });
 
-  const queueItem = printQueue[index];
-
   // Check if the current user is the uploader
-  if (queueItem.originalUploader !== req.session.user.id) {
+  if (index.originalUploader !== req.session.user.id) {
     return res.status(403).json({ message: 'You are not authorized to delete this file' });
   }
 
-  const filePath = path.join(__dirname, 'uploads', queueItem.filename);
+  const filePath = path.join(__dirname, 'uploads', index.filename);
 
   // Delete the file
-  fs.unlink(filePath, (err) => {
+  fs.unlink(filePath, async (err) => {
     if (err) {
       console.error('Error deleting file:', err);
       return res.status(500).json({ message: 'Failed to delete the file' });
     }
 
     // Remove the item from the queue
-    const [deletedItem] = printQueue.splice(index, 1);
-    saveQueue(printQueue);
-    res.status(200).json({ message: 'Item and file deleted successfully', deletedItem });
+    const docRef = db.collection("queue").doc(queueItemSearch.docs[0].id);
+    await docRef.delete();
+    res.status(200).json({ message: 'Item and file deleted successfully', index });
   });
 });
 
@@ -738,12 +745,21 @@ app.post('/auth/logout', (req, res) => {
 });
 
 // Route to send the first .gcode file in the queue to any requester
-app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), (req, res) => {
-  if (printQueue.length === 0) {
+app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), async (req, res) => {
+
+  const queueItems = await db.collection('queue').where("timestamp", "asc").get();
+
+  if (queueItems.empty) {
     return res.status(404).json({ message: 'The queue is empty' });
   }
 
-  const firstQueueItem = printQueue[0];
+  // if (printQueue.length === 0) { // TODO
+  //   return res.status(404).json({ message: 'The queue is empty' });
+  // }
+
+  //const firstQueueItem = printQueue[0]; // TODO
+  const firstQueueItem = queueItems.docs[0];
+
   const filePath = path.join(__dirname, 'uploads', firstQueueItem.filename);
 
   // Check if the file exists
@@ -755,7 +771,7 @@ app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${firstQueueItem.originalFilename}"`);
 
   // Send the .gcode file
-  res.sendFile(filePath, (err) => {
+  res.sendFile(filePath, async (err) => {
     if (err) {
       console.error('Error sending file:', err);
       res.status(500).json({ message: 'Failed to send the file' });
@@ -767,8 +783,12 @@ app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), (req, res) => {
           return res.status(500).json({ message: 'Failed to delete the file' });
         }
       })
-      printQueue.shift();
-      saveQueue(printQueue);
+      // printQueue.shift(); // TODO
+      // saveQueue(printQueue); // TODO
+
+      const docRef = db.collection("queue").doc(queueItems.docs[0].id);
+      await docRef.delete();
+
       console.log(`File sent: ${firstQueueItem.originalFilename}`);
     }
   });
