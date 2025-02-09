@@ -747,7 +747,7 @@ app.post('/auth/logout', (req, res) => {
 // Route to send the first .gcode file in the queue to any requester
 app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), async (req, res) => {
 
-  const queueItems = await db.collection('queue').where("timestamp", "asc").get();
+  const queueItems = await db.collection('queue').orderBy("timestamp", "asc").get();
 
   if (queueItems.empty) {
     return res.status(404).json({ message: 'The queue is empty' });
