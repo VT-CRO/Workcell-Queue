@@ -31,7 +31,13 @@ const Thumbnail = ({ queueItemId, backendUrl }) => {
         className="w-24 h-24 object-cover rounded-md"
       />
       ) : (
-        <p>No thumbnail available</p>
+        <img
+        src="/nothumbnail.png"
+        alt="No Thumbnail Image"
+        className="w-24 h-24 object-cover rounded-md"
+      />
+        
+        
       )}
     </div>
   );
