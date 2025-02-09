@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.3 - Aurora"
+const VERSION = "1.1.6 - Aurora"
 let ONLINE = false;
 
 // Load or generate a UUID for the bot
@@ -747,7 +747,7 @@ app.post('/auth/logout', (req, res) => {
 // Route to send the first .gcode file in the queue to any requester
 app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), async (req, res) => {
 
-  const queueItems = await db.collection('queue').where("timestamp", "asc").get();
+  const queueItems = await db.collection('queue').orderBy("uploadedAt", "asc").get();
 
   if (queueItems.empty) {
     return res.status(404).json({ message: 'The queue is empty' });
@@ -758,7 +758,7 @@ app.get(`/${botUuid}/requestgcode`, cors(openCorsOptions), async (req, res) => {
   // }
 
   //const firstQueueItem = printQueue[0]; // TODO
-  const firstQueueItem = queueItems.docs[0];
+  const firstQueueItem = queueItems.docs[0].data();
 
   const filePath = path.join(__dirname, 'uploads', firstQueueItem.filename);
 
