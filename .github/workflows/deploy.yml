@@ -1,59 +1,87 @@
-name: Deploy React App to EC2
+name: Deploy to EC2
 
 on:
   push:
     branches:
-      - main  # Or your main branch (e.g., master)
+      - main
 
 jobs:
   deploy:
+    name: Deploy
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
+      # Optionally install node for local build steps (if needed)
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18  # Or your Node.js version
+          node-version: '16'  # Update as needed
 
-      - name: Install dependencies (frontend)
-        working-directory: ./frontend  # Navigate to the frontend directory
-        run: npm install
-
-        
-      - name: Create SSH key
+      # Build Frontend (optional local build and then SCP to the server)
+      # Alternatively, you can perform the build directly on your EC2
+      - name: Install Frontend Dependencies & Build
+        working-directory: frontend
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
+          npm install
+          npm run build
 
-      - name: Set environment variables on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "
-            export VITE_BACKEND_URL='${{ secrets.VITE_BACKEND_URL }}'
-          "
-
-      - name: Build React app
-        working-directory: ./frontend  # Navigate to the frontend directory
-        run: npm run build
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      # Upload the frontend build and backend files to the server via scp/ rsync,
+      # or run commands on the server to pull the GitHub repo.
+      # Here, we assume remote commands on the EC2 to pull the latest code and build.
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.7
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2  # Replace with your AWS region
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # If your EC2 uses a non-standard port, uncomment and set below:
+          # port: ${{ secrets.EC2_SSH_PORT }}
+          script: |
+            set -e
 
-      - name: Copy files to EC2
-        run: |
-          # Remove the directory on the EC2 instance
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "sudo rm -rf /var/www/html/*"
+            echo "Navigating to the project directory..."
+            cd ~/Workcell-Queue
 
-          # Copy the files from the GitHub Actions runner to the EC2 instance
-          scp -o StrictHostKeyChecking=no -r -i ~/.ssh/id_rsa frontend/dist/* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+            echo "Pulling latest code..."
+            git pull origin main
 
-          # Restart Nginx
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "sudo systemctl restart nginx"
+            echo "Updating environment variables..."
+            
+            cat <<EOF > ~/Workcell-Queue/frontend/.env
+            VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
+            EOF
+
+            cat <<EOF > ~/Workcell-Queue/backend/.env
+            PORT=3000
+            DISCORD_GUILD_ID=${{ secrets.GUILD_ID }}
+            DISCORD_CLIENT_ID=${{ secrets.CLIENT_ID }}
+            DISCORD_CHANNEL_ID=${{ secrets.CHANNEL_ID }}
+            DISCORD_BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
+            DISCORD_REDIRECT_URI=${{ secrets.REDIRECT_URI }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+            DOCKER_MOUNT=${{ secrets.DOCKER_MOUNT }}
+            FIREBASE_FILE=${{ secrets.FIREBASE_FILE }}
+            EOF
+
+            echo "Building frontend..."
+            cd frontend
+            npm install
+            npm run build
+            cd ..
+
+            echo "Restarting backend..."
+            cd backend
+            npm install
+
+            # If using pm2 (example):
+            if pm2 describe backend > /dev/null 2>&1; then
+              pm2 reload backend --update-env
+            else
+              pm2 start server.js --name backend --update-env
+            fi
+
+            echo "Deployment finished!"
