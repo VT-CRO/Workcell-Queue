@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'  # Update as needed
+          node-version: '18'  # Update as needed
 
       # Build Frontend (optional local build and then SCP to the server)
       # Alternatively, you can perform the build directly on your EC2
