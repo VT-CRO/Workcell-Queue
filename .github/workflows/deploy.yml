@@ -40,6 +40,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
+      - name: Set ownership and permissions on /var/www/html/
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "sudo chown -R ubuntu:ubuntu /var/www/html/ && sudo chmod -R 755 /var/www/html/"
+
       - name: Copy files to EC2
         run: |
           # Remove the directory on the EC2 instance
