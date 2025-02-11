@@ -8,7 +8,6 @@ const Footer = () => {
         const fetchVersion = async () => {
             try {
                 const response = await fetch(`${backendUrl}/version`);
-                console.log(`${backendUrl}/version`)
                 if (response.ok) {
                     const data = await response.json();
                     setVersion(data.version);
