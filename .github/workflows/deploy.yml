@@ -51,6 +51,7 @@ jobs:
             
             cat <<EOF > ~/Workcell-Queue/frontend/.env
             VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
+            VITE_FRONTEND_URL=${{ secrets.FRONTEND_BACKEND_URL }}
             EOF
 
             cat <<EOF > ~/Workcell-Queue/backend/.env
