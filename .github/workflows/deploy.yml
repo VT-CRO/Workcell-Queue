@@ -42,13 +42,11 @@ jobs:
 
       - name: Copy files to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "
-            sudo rm -rf /var/www/html/*
-            scp -r -i ~/.ssh/id_rsa frontend/dist/* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
-            sudo systemctl restart nginx
-          "
-      - name: List contents of build directory
-        working-directory: ./frontend
-        run: ls -l dist
+          # Remove the directory on the EC2 instance
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "sudo rm -rf /var/www/html/*"
 
+          # Copy the files from the GitHub Actions runner to the EC2 instance
+          scp -o StrictHostKeyChecking=no -r -i ~/.ssh/id_rsa frontend/dist/* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
 
+          # Restart Nginx
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "sudo systemctl restart nginx"
