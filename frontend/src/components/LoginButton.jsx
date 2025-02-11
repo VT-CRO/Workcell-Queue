@@ -1,4 +1,4 @@
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = import.meta.env.VITE_FRONTEND_URL;
 
 const LoginButton = () => (
   <a

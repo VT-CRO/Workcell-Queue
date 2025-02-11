@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import UploadSection from '../components/UploadSection';
 import PrintQueue from '../components/PrintQueue';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = import.meta.env.VITE_FRONTEND_URL;
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);

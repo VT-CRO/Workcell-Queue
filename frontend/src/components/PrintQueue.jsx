@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Thumbnail from './Thumbnail';
 
 const PrintQueue = ({ queue, refreshQueue, user }) => {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+  const backendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000';
   const [error, setError] = useState(null); // State for error messages
 
   const handleDelete = async (id) => {

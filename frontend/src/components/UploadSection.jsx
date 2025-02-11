@@ -2,7 +2,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { FaUpload } from 'react-icons/fa';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = import.meta.env.VITE_FRONTEND_URL;
 
 const UploadSection = ({ refreshQueue }) => {
   const [file, setFile] = useState(null);

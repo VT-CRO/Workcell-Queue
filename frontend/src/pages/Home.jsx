@@ -4,7 +4,7 @@ import LoginButton from '../components/LoginButton';
 
 const Home = () => {
   const navigate = useNavigate();
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+  const backendUrl =  import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000';
 
   useEffect(() => {
     // Check if the user is logged in
