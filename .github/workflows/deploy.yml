@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to Oracle
 
 on:
   push:
@@ -13,31 +13,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Optionally install node for local build steps (if needed)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'  # Update as needed
+          node-version: '18'
 
-      # Build Frontend (optional local build and then SCP to the server)
-      # Alternatively, you can perform the build directly on your EC2
       - name: Install Frontend Dependencies & Build
         working-directory: frontend
         run: |
           npm install
           npm run build
 
-      # Upload the frontend build and backend files to the server via scp/ rsync,
-      # or run commands on the server to pull the GitHub repo.
-      # Here, we assume remote commands on the EC2 to pull the latest code and build.
-      - name: Deploy to EC2 via SSH
+      - name: Deploy to Oracle via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          # If your EC2 uses a non-standard port, uncomment and set below:
-          # port: ${{ secrets.EC2_SSH_PORT }}
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
           script: |
             set -e
 
@@ -47,42 +39,58 @@ jobs:
             echo "Pulling latest code..."
             git pull origin main
 
+            # Update environment variables
             echo "Updating environment variables..."
-            
             cat <<EOF > ~/Workcell-Queue/frontend/.env
-            VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
-            VITE_FRONTEND_URL=${{ secrets.FRONTEND_BACKEND_URL }}
-            EOF
+VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
+VITE_FRONTEND_URL=${{ secrets.FRONTEND_BACKEND_URL }}
+EOF
 
             cat <<EOF > ~/Workcell-Queue/backend/.env
-            PORT=3000
-            DISCORD_GUILD_ID=${{ secrets.GUILD_ID }}
-            DISCORD_CLIENT_ID=${{ secrets.CLIENT_ID }}
-            DISCORD_CHANNEL_ID=${{ secrets.CHANNEL_ID }}
-            DISCORD_BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-            DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
-            DISCORD_REDIRECT_URI=${{ secrets.REDIRECT_URI }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-            DOCKER_MOUNT=${{ secrets.DOCKER_MOUNT }}
-            FIREBASE_FILE=${{ secrets.FIREBASE_FILE }}
-            EOF
+PORT=3000
+DISCORD_GUILD_ID=${{ secrets.GUILD_ID }}
+DISCORD_CLIENT_ID=${{ secrets.CLIENT_ID }}
+DISCORD_CHANNEL_ID=${{ secrets.CHANNEL_ID }}
+DISCORD_BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
+DISCORD_REDIRECT_URI=${{ secrets.REDIRECT_URI }}
+FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+DOCKER_MOUNT=${{ secrets.DOCKER_MOUNT }}
+FIREBASE_FILE=${{ secrets.FIREBASE_FILE }}
+EOF
 
-            echo "Building frontend..."
-            cd frontend
-            npm install
-            npm run build
-            cd ..
-
-            echo "Restarting backend..."
-            cd backend
-            npm install
-
-            # If using pm2 (example):
-            if pm2 describe backend > /dev/null 2>&1; then
-              pm2 reload backend --update-env
+            # Check if there are changes in the frontend directory
+            FRONTEND_CHANGED=$(git diff --name-only HEAD~1 | grep '^frontend/' || true)
+            if [ -n "$FRONTEND_CHANGED" ]; then
+              echo "Frontend changes detected:"
+              echo "$FRONTEND_CHANGED"
+              echo "Building frontend..."
+              cd frontend
+              npm install
+              npm run build
+              cd ..
             else
-              pm2 start server.js --name backend --update-env
+              echo "No changes detected in frontend directory. Skipping frontend build."
+            fi
+
+            # Check if there are changes in the backend directory
+            BACKEND_CHANGED=$(git diff --name-only HEAD~1 | grep '^backend/' || true)
+            if [ -n "$BACKEND_CHANGED" ]; then
+              echo "Backend changes detected:"
+              echo "$BACKEND_CHANGED"
+              echo "Restarting backend..."
+              cd backend
+              npm install
+              # If using pm2 (example):
+              if pm2 describe backend > /dev/null 2>&1; then
+                pm2 reload backend --update-env
+              else
+                pm2 start server.js --name backend --update-env
+              fi
+              cd ..
+            else
+              echo "No changes detected in backend directory. Skipping backend restart."
             fi
 
             echo "Deployment finished!"

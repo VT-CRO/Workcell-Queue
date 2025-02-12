@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 const Footer = () => {
     const [version, setVersion] = useState("Loading...");
     const backendUrl = import.meta.env.VITE_FRONTEND_URL;
-    console.log(backendUrl)
 
     useEffect(() => {
         const fetchVersion = async () => {
