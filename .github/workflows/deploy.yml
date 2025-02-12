@@ -42,23 +42,23 @@ jobs:
             # Update environment variables
             echo "Updating environment variables..."
             cat <<EOF > ~/Workcell-Queue/frontend/.env
-VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
-VITE_FRONTEND_URL=${{ secrets.FRONTEND_BACKEND_URL }}
-EOF
-
-            cat <<EOF > ~/Workcell-Queue/backend/.env
-PORT=3000
-DISCORD_GUILD_ID=${{ secrets.GUILD_ID }}
-DISCORD_CLIENT_ID=${{ secrets.CLIENT_ID }}
-DISCORD_CHANNEL_ID=${{ secrets.CHANNEL_ID }}
-DISCORD_BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
-DISCORD_REDIRECT_URI=${{ secrets.REDIRECT_URI }}
-FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-DOCKER_MOUNT=${{ secrets.DOCKER_MOUNT }}
-FIREBASE_FILE=${{ secrets.FIREBASE_FILE }}
-EOF
+            VITE_BACKEND_URL=${{ secrets.BACKEND_URL }}
+            VITE_FRONTEND_URL=${{ secrets.FRONTEND_BACKEND_URL }}
+            EOF
+            
+                        cat <<EOF > ~/Workcell-Queue/backend/.env
+            PORT=3000
+            DISCORD_GUILD_ID=${{ secrets.GUILD_ID }}
+            DISCORD_CLIENT_ID=${{ secrets.CLIENT_ID }}
+            DISCORD_CHANNEL_ID=${{ secrets.CHANNEL_ID }}
+            DISCORD_BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
+            DISCORD_REDIRECT_URI=${{ secrets.REDIRECT_URI }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+            DOCKER_MOUNT=${{ secrets.DOCKER_MOUNT }}
+            FIREBASE_FILE=${{ secrets.FIREBASE_FILE }}
+            EOF
 
             # Check if there are changes in the frontend directory
             FRONTEND_CHANGED=$(git diff --name-only HEAD~1 | grep '^frontend/' || true)
