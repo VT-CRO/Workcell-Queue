@@ -26,7 +26,7 @@ const Footer = () => {
 
     return (
         <footer className="bg-gray-900 text-white p-4 text-center">
-            <p>VT CRO Print Queue - Backend Version: {version}</p>
+            <p>VT CRO Print Queue - Frontend Version: 1.1.1 - Backend Version: {version}</p>
         </footer>
     );
 };
