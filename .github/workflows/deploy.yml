@@ -13,17 +13,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install Frontend Dependencies & Build
-        working-directory: frontend
-        run: |
-          npm install
-          npm run build
-
       - name: Deploy to Oracle via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
