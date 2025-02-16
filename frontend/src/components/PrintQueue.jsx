@@ -1,11 +1,17 @@
 import PropTypes from 'prop-types';
 import { FaTrash } from 'react-icons/fa';
+import { FaToggleOff } from 'react-icons/fa';
+import { FaToggleOn } from 'react-icons/fa';
 import { useState } from 'react';
 import Thumbnail from './Thumbnail';
+
+
 
 const PrintQueue = ({ queue, refreshQueue, user }) => {
   const backendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000';
   const [error, setError] = useState(null); // State for error messages
+  const [isActive, setIsActive] = useState(false); //State for Toggle Slider
+  //const handleOverride
 
   const handleDelete = async (id) => {
     try {
@@ -41,6 +47,8 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
 
               {/* File details */}
               <div className="ml-4 flex flex-col">
+
+
                 <div className="flex items-center">
                   {/* File name */}
                   <span
@@ -60,8 +68,18 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                       <FaTrash />
                     </button>
                   )}
-                </div>
 
+                  {/* SliderToggle Override */}             
+                  <button 
+                      onClick={() => setIsActive(!isActive)}
+                       
+                      className="text-black-500 hover:text-black-700 ml-6"
+                      aria-label="Override"
+                    >
+                      {isActive ? <FaToggleOn size={'2em'}/> : <FaToggleOff size={'2em'}/>}
+                  </button>
+                  
+                </div>
                 {/* Uploader details */}
                 <span
                   className="text-sm"
@@ -69,8 +87,11 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                 >
                   By {item.uploader}
                 </span>
+                
+              
               </div>
             </li>
+            
           ))}
         </ul>
       ) : (
