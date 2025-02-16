@@ -865,7 +865,16 @@ app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
 // // Handle 404 errors
 // app.use((req, res) => res.status(404).send('Route not found'));
 
+// const verifyAdminStatus = async (req, res) => {
+  
+//   next();  
+// }
+
 app.get(`/users`, async (req, res) => {
+
+  const user = await db.collection("users").doc(req.session.user.id).get(); 
+  req.session.isAdmin = user.get("isAdmin");
+
   if (!req.session.isAdmin) return res.status(401).send('Unauthorized');
 
   const users = await db.collection("users").get();
