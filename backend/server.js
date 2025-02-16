@@ -181,6 +181,7 @@ const verifyGuildMembership = async (req, res, next) => {
     const userData = {
       username: req.session.user.username,
       nickname: guildMember.nick || null, // Store the server-specific nickname
+      email: req.session.user.email,
       avatar: req.session.user.avatar,
       id: req.session.user.id,
       discriminator: req.session.user.discriminator,
@@ -331,6 +332,12 @@ app.get('/auth/callback', async (req, res) => {
       .then(doc => {
         if (doc.exists) {
           userUUID = doc.data().uuid;
+          if (doc.data().isAdmin == true) {
+            req.session.isAdmin = true;
+          }
+          else {
+            req.session.isAdmin = false;
+          }
         }
         else {
           userUUID = uuidv4(); // Generate a new UUID if not already stored
@@ -340,13 +347,16 @@ app.get('/auth/callback', async (req, res) => {
             username: userData.username,
             email: userData.email,
             uuid: userUUID,
-            totalPrintsQueued: 0
+            totalPrintsQueued: 0,
+            isAdmin: false
           })
+          req.session.isAdmin = false;
         }
 
         userData.uuid = userUUID; // Attach the UUID to the user data
 
         req.session.user = userData;
+ 
         // Redirect with the UUID (you could also provide it in the frontend)
         res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
       })
@@ -456,6 +466,13 @@ app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('f
     };
 
     await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
+    
+    // increase print total by one
+    const docRef = db.collection('users').doc(userData.id);
+    
+    docRef.update({
+      totalPrintsQueued: admin.firestore.FieldValue.increment(1)
+    })
     
     res.status(200).json({ message: 'File uploaded successfully', queueItem });
   } catch (error) {
@@ -668,6 +685,13 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
 
     await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
 
+    // increase print total by one
+    const docRef = db.collection('users').doc(userData.id);
+    
+    docRef.update({
+      totalPrintsQueued: admin.firestore.FieldValue.increment(1)
+    })
+
     res.status(200).json({ message: 'File uploaded successfully', queueItem });
   } catch (error) {
     console.error('Error fetching user data from Firebase:', error);
@@ -692,7 +716,7 @@ app.get('/queue', async (req, res) => {
 
   let docs = [];
   queueRef.forEach((doc) => {
-    docs.push({...doc.data() });
+    docs.push({ ...doc.data() });
   });
 
   res.json(docs);
@@ -840,6 +864,25 @@ app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
 
 // // Handle 404 errors
 // app.use((req, res) => res.status(404).send('Route not found'));
+
+app.get(`/users`, async (req, res) => {
+  if (!req.session.isAdmin) return res.status(401).send('Unauthorized');
+
+  const users = await db.collection("users").get();
+
+  if (users.empty) {
+    return [];
+  }
+
+  let docs = [];
+  users.forEach(doc => {
+    docs.push({ id: doc.id, ...doc.data() });
+  })
+
+  res.send(docs);
+
+});
+
 
 // Log all requests
 app.use((req, res, next) => {
