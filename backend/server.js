@@ -34,7 +34,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "Generic PLA template @Voron v2 300mm3 0.4 nozzle"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.10 - Aurora"
+const VERSION = "1.1.11 - Aurora"
 let ONLINE = false;
 
 // Load or generate a UUID for the bot
@@ -518,7 +518,7 @@ const editJsonFile = (filePath, authorName, id) => {
   }
 
   data.print_host = `${PRINTER_HOST}/${id}`;
-  data.inherits = "Voron v2 300mm3 0.4 nozzle";
+  data.inherits = "Voron 2.4 300 0.4 nozzle";
   data.default_filament_profile = DEFAULT_FILAMENT;
   data.default_print_profile = DEFAULT_PROCESS;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
