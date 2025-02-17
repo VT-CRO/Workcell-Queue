@@ -518,7 +518,7 @@ const editJsonFile = (filePath, authorName, id) => {
   }
 
   data.print_host = `${PRINTER_HOST}/${id}`;
-  data.inherits = "";
+  data.inherits = "Voron v2 300mm3 0.4 nozzle";
   data.default_filament_profile = DEFAULT_FILAMENT;
   data.default_print_profile = DEFAULT_PROCESS;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
