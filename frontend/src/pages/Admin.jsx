@@ -23,12 +23,7 @@ const Admin = () => {
         return res.json();
       })
       .then((data) => {
-        if (data.isAdmin == false) {
-          setAdmin(null);
-        }
-        else {
-          setAdmin(data);
-        }
+        setAdmin(data);
         setError(null); // Clear any existing error
       })
       .catch((err) => {
