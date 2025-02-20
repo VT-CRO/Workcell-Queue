@@ -6,7 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import fetch from 'node-fetch';
-import dotenv from 'dotenv';
+import dotenv, { config } from 'dotenv';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import zip from 'adm-zip'; // Ensure to install 'adm-zip' for handling zip files
@@ -36,7 +36,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.12 - Aurora"
+const VERSION = "1.1.13 - Aurora"
 const CONFIG_VERSION = "1.0.0"
 let ONLINE = false;
 
@@ -351,7 +351,8 @@ app.get('/auth/callback', async (req, res) => {
             email: userData.email,
             uuid: userUUID,
             totalPrintsQueued: 0,
-            isAdmin: false
+            isAdmin: false,
+            configVersion: null,
           })
           req.session.isAdmin = false;
         }
@@ -587,6 +588,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
   // fix this TODO
   
   let user = null;
+  let userDocRef = null;
   const docRef = db.collection("users");
 
   // Retrieve all documents
@@ -596,6 +598,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
         if (doc.data().uuid === uuid) {
           // set user
           user = doc.data();
+          userDocRef = doc.ref;
         }
       });
       if (!user) {
@@ -645,10 +648,13 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
         repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
     
         // Step 4: Serve the modified file
+        userDocRef.update({
+          configVersion: CONFIG_VERSION
+        })
         return res.download(outputOrcaPrinter, `${MACHINE_NAME}-${discordUser.username}.bbscfg`);
       } catch (error) {
         console.error('Error processing .orca_printer file:', error);
-        return res.status(500).json({ message: 'Failed to process the .orca_printer file.' });
+        return res.status(500).json({ message: 'Failed to process the config file' });
       }
     })
     .catch(error => {
@@ -678,6 +684,8 @@ app.get('/dashboard', verifyGuildMembership, async (req, res) => {
       id: userData.id,
       discriminator: userData.discriminator,
       nickname: userData.nickname || null, // Include the server-specific nickname
+      configVersion: userData.configVersion,
+      serverConfigVersion: CONFIG_VERSION,
     });
   } catch (error) {
     console.error('Error fetching user data from Firebase:', error);
