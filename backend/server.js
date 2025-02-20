@@ -11,6 +11,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import zip from 'adm-zip'; // Ensure to install 'adm-zip' for handling zip files
 import admin from 'firebase-admin';
+import { promises as sf } from 'fs';
+
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -27,14 +29,15 @@ const db = admin.firestore();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const MACHINE_NAME = "CRO Voron 2.4";
-const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.orca_printer`);
-const EXTRACT_PATH = path.join(__dirname, 'extracted_orca_printer');
+const MACHINE_NAME = "CRO Queue";
+const ORIGINAL_ORCA_PRINTER = path.join(__dirname, `${MACHINE_NAME}.bbscfg`);
+const EXTRACT_PATH = path.join(__dirname, 'extracted_bambu_printer');
 const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
-const DEFAULT_FILAMENT = "PLA"
+const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.11 - Aurora"
+const VERSION = "1.1.12 - Aurora"
+const CONFIG_VERSION = "1.0.0"
 let ONLINE = false;
 
 // Load or generate a UUID for the bot
@@ -435,51 +438,81 @@ app.get('/:uuid/api/version', verifyGuildMembershipByUUID, (req, res) => {
 });
 
 // Remote file upload by UUID
-app.post('/:uuid/api/files/local', verifyGuildMembershipByUUID, upload.single('file'), async (req, res) => {
-  const { uuid } = req.params;
+app.post(
+  '/:uuid/api/files/local',
+  verifyGuildMembershipByUUID,
+  upload.single('file'),
+  async (req, res) => {
+    const { uuid } = req.params;
+    const file = req.file;
+    if (!file) return res.status(400).send('No file uploaded');
 
-  const file = req.file;
-  if (!file) return res.status(400).send('No file uploaded');
+    try {
+      // Read the file content as text using an options object
+      const fileContent = fs.readFileSync(file.path, 'utf-8');
 
-  try {
-    // Fetch the user's data from Firebase using their UUID
-    const userSnapshot = await db.collection('users').where('uuid', '==', uuid).get();
+      // Split the file into lines, and inspect only the first 600
+      const lines = fileContent.split('\n').slice(0, 600);
+      const validVersionFound = lines.some(
+        (line) => line.trim() === `; VERSION: ${CONFIG_VERSION}`
+      );
 
-    if (userSnapshot.empty) {
-      return res.status(404).json({ message: 'User not found in the database' });
+      if (!validVersionFound) {
+        await sf.unlink(file.path);
+        return res.status(400).json({
+          message:
+            'Old configuration file detected. Please update to the latest version.',
+        });
+      }
+
+      // Fetch the user's data from Firebase using their UUID
+      const userSnapshot = await db
+        .collection('users')
+        .where('uuid', '==', uuid)
+        .get();
+
+      if (userSnapshot.empty) {
+        return res
+          .status(404)
+          .json({ message: 'User not found in the database' });
+      }
+
+      // Extract the user data (assuming UUIDs are unique, so there will only be one document)
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data();
+
+      // Use the server-specific nickname if it exists, otherwise fallback to the username
+      const uploader = userData.nickname || userData.username;
+
+      const queueItem = {
+        id: uuidv4(),
+        filename: file.filename,
+        originalFilename: file.originalname,
+        uploader: uploader, // Use the nickname or username
+        originalUploader: userData.id,
+        uploadedAt: new Date(),
+      };
+
+      await db
+        .collection('queue')
+        .doc(queueItem.uploadedAt.toISOString())
+        .set(queueItem, { merge: true });
+
+      // Increase print total by one
+      const docRef = db.collection('users').doc(userData.id);
+      await docRef.update({
+        totalPrintsQueued: admin.firestore.FieldValue.increment(1),
+      });
+
+      res
+        .status(200)
+        .json({ message: 'File uploaded successfully', queueItem });
+    } catch (error) {
+      console.error('Error processing file upload:', error);
+      res.status(500).send('Internal Server Error');
     }
-
-    // Extract the user data (assuming UUIDs are unique, so there will only be one document)
-    const userDoc = userSnapshot.docs[0];
-    const userData = userDoc.data();
-
-    // Use the server-specific nickname if it exists, otherwise fallback to the username
-    const uploader = userData.nickname || userData.username;
-
-    const queueItem = {
-      id: uuidv4(),
-      filename: file.filename,
-      originalFilename: file.originalname,
-      uploader: uploader, // Use the nickname or username
-      originalUploader: userData.id,
-      uploadedAt: new Date(),
-    };
-
-    await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
-    
-    // increase print total by one
-    const docRef = db.collection('users').doc(userData.id);
-    
-    docRef.update({
-      totalPrintsQueued: admin.firestore.FieldValue.increment(1)
-    })
-    
-    res.status(200).json({ message: 'File uploaded successfully', queueItem });
-  } catch (error) {
-    console.error('Error fetching user data from Firebase:', error);
-    res.status(500).send('Internal Server Error');
   }
-});
+);
 
 // Error handling middleware for Multer and other errors
 app.use((err, req, res, next) => {
@@ -518,7 +551,6 @@ const editJsonFile = (filePath, authorName, id) => {
   }
 
   data.print_host = `${PRINTER_HOST}/${id}`;
-  data.inherits = "Voron 2.4 300 0.4 nozzle";
   data.default_filament_profile = DEFAULT_FILAMENT;
   data.default_print_profile = DEFAULT_PROCESS;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
@@ -533,8 +565,7 @@ const editFilament = (filePath) => {
 
 const editPrint = (filePath) => {
   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  data.brim_type = "no_brim";
-  data.filename_format = "{input_filename_base}_{filament_type[initial_tool]}_{print_time}.gcode";
+  data.filename_format = "{input_filename_base}_{filament_type[0]}_{print_time}.gcode";
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 };
 
@@ -595,12 +626,12 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
         editJsonFile(jsonFileToEdit, discordUser.id, uuid);
     
         // Step 3: Edit the Filament file
-        const filamentPath = path.join(userExtractPath, 'filament');
-        const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
-        files.forEach((file) => {
-          const jsonFileToEdit = path.join(filamentPath, file);
-          editFilament(jsonFileToEdit);
-        });
+        // const filamentPath = path.join(userExtractPath, 'filament');
+        // const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
+        // files.forEach((file) => {
+        //   const jsonFileToEdit = path.join(filamentPath, file);
+        //   editFilament(jsonFileToEdit);
+        // });
     
         // Step 4: Edit the Print file
         const printPath = path.join(userExtractPath, 'process');
@@ -614,7 +645,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
         repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
     
         // Step 4: Serve the modified file
-        return res.download(outputOrcaPrinter, `${MACHINE_NAME}-${discordUser.username}.orca_printer`);
+        return res.download(outputOrcaPrinter, `${MACHINE_NAME}-${discordUser.username}.bbscfg`);
       } catch (error) {
         console.error('Error processing .orca_printer file:', error);
         return res.status(500).json({ message: 'Failed to process the .orca_printer file.' });
@@ -662,6 +693,24 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
   if (!file) return res.status(400).send('No file uploaded');
 
   try {
+
+    // Read the file content as text using an options object
+    const fileContent = fs.readFileSync(file.path, 'utf-8');
+
+    // Split the file into lines, and inspect only the first 600
+    const lines = fileContent.split('\n').slice(0, 600);
+    const validVersionFound = lines.some(
+      (line) => line.trim() === `; VERSION: ${CONFIG_VERSION}`
+    );
+
+    if (!validVersionFound) {
+      await sf.unlink(file.path);
+      return res.status(400).json({
+        message:
+          'Old configuration file detected. Please update to the latest version.',
+      });
+    }
+
     // Fetch the user's data from Firebase using their UUID
     const userDoc = await db.collection('users').doc(req.session.user.id).get();
 
