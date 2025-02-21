@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import UploadSection from '../components/UploadSection';
-import PrintQueue from '../components/PrintQueue';
+import { useState, useEffect } from "react";
+import UploadSection from "../components/UploadSection";
+import PrintQueue from "../components/PrintQueue";
 import { IoIosInformationCircleOutline } from "react-icons/io";
 
 const backendUrl = import.meta.env.VITE_FRONTEND_URL;
@@ -83,8 +83,14 @@ const ConfigInstructionsModal = ({ onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 relative overflow-y-auto max-h-full">
+    <div
+      className="fixed inset-0 flex items-center justify-center 
+                 bg-black bg-opacity-50 z-50"
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 
+                   relative overflow-y-auto max-h-full"
+      >
         <button
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
           onClick={onClose}
@@ -96,14 +102,20 @@ const ConfigInstructionsModal = ({ onClose }) => {
         </h3>
         <div className="space-y-6">
           {instructions.map((step, index) => (
-            <div key={index} className="flex flex-col md:flex-row items-center">
+            <div
+              key={index}
+              className="flex flex-col md:flex-row items-center"
+            >
               <img
                 src={step.imageUrl}
                 alt={step.title}
-                className="w-64 h-auto rounded-md mb-4 md:mb-0 md:mr-6"
+                className="w-64 h-auto rounded-md mb-4 md:mb-0 
+                           md:mr-6"
               />
               <div>
-                <h4 className="text-xl font-semibold mb-2">{step.title}</h4>
+                <h4 className="text-xl font-semibold mb-2">
+                  {step.title}
+                </h4>
                 <p>{step.text}</p>
               </div>
             </div>
@@ -121,14 +133,14 @@ const Dashboard = () => {
   const [showInstructions, setShowInstructions] = useState(false);
 
   const fetchUser = () => {
-    fetch(`${backendUrl}/dashboard`, { credentials: 'include' })
+    fetch(`${backendUrl}/dashboard`, { credentials: "include" })
       .then((res) => {
         if (res.status === 401) {
-          setError('Unauthorized access. Please log in.');
+          setError("Unauthorized access. Please log in.");
           return null;
         }
         if (!res.ok) {
-          throw new Error('Failed to fetch user data.');
+          throw new Error("Failed to fetch user data.");
         }
         return res.json();
       })
@@ -138,15 +150,15 @@ const Dashboard = () => {
       })
       .catch((err) => {
         console.error(err);
-        setError('An error occurred while fetching user data.');
+        setError("An error occurred while fetching user data.");
       });
   };
 
   const fetchQueue = () => {
-    fetch(`${backendUrl}/queue`, { credentials: 'include' })
+    fetch(`${backendUrl}/queue`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) {
-          throw new Error('Failed to fetch the print queue.');
+          throw new Error("Failed to fetch the print queue.");
         }
         return res.json();
       })
@@ -156,7 +168,7 @@ const Dashboard = () => {
       })
       .catch((err) => {
         console.error(err);
-        setError('An error occurred while fetching the print queue.');
+        setError("An error occurred while fetching the print queue.");
       });
   };
 
@@ -169,14 +181,16 @@ const Dashboard = () => {
   const handleDownload = () => {
     if (user) {
       const downloadUrl = `${backendUrl}/${user.uuid}/api/download`;
-      // Redirecting to the download URL.
-      // Assuming the backend updates the configVersion when this endpoint is hit.
+      // Redirect to the download URL.
       window.location.href = downloadUrl;
       setTimeout(() => {
         fetchUser();
       }, 2000);
     }
   };
+
+  const isConfigUpToDate =
+    user && user.configVersion === user.serverConfigVersion;
 
   return (
     <section className="container mx-auto p-8 pt-10">
@@ -186,28 +200,31 @@ const Dashboard = () => {
         <>
           <div className="flex flex-wrap items-center space-x-4 mb-10">
             <button
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 
-              shadow-md transition-all duration-200 flex items-center"
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg 
+                         hover:bg-blue-600 shadow-md transition-all 
+                         duration-200 flex items-center"
               onClick={handleDownload}
             >
               Download Configuration
             </button>
-            {/* Info button using IoIosInformationCircleOutline */}
             <button
               className="w-10 h-10 bg-gray-200 rounded-full flex items-center 
-                         justify-center text-blue-500 hover:bg-gray-300 transition-all 
-                         duration-200"
+                         justify-center text-blue-500 hover:bg-gray-300 
+                         transition-all duration-200"
               onClick={() => setShowInstructions(true)}
             >
               <IoIosInformationCircleOutline size={24} />
             </button>
           </div>
-          {/* Render UploadSection and PrintQueue only when configuration is up to date */}
-          {user.configVersion === user.serverConfigVersion && (
+          {isConfigUpToDate ? (
             <>
               <UploadSection refreshQueue={fetchQueue} />
               <PrintQueue queue={queue} refreshQueue={fetchQueue} user={user} />
             </>
+          ) : (
+            <p className="text-lg text-gray-700">
+              Please download the configuration.
+            </p>
           )}
         </>
       ) : (
