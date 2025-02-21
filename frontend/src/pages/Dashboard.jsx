@@ -13,7 +13,7 @@ const ConfigInstructionsModal = ({ onClose }) => {
         <>
           Download from{" "}
           <a
-            href="https://download-link.com"
+            href="https://bambulab.com/en/download/studio"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 underline"
