@@ -94,6 +94,20 @@ const fetchDiscordUser = async (token) => {
   return await response.json();
 };
 
+// Helper function to fetch Discord user roles
+const fetchUserRoles = async (token, userId) => {
+  const response = await fetch(`${DISCORD_API_URL}/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  const data = await response.json()
+
+  return data.roles
+}
+
 // extracts thumbnail from print file 
 function extractThumbnail(filePath) {
   try {
@@ -323,6 +337,11 @@ app.get('/auth/callback', async (req, res) => {
     const tokenData = await tokenResponse.json();
     const userData = await fetchDiscordUser(tokenData.access_token);
 
+    const userRoles = await fetchUserRoles(tokenData.access_token, userData.id)
+    console.log(userRoles);
+    
+
+
     // Verify user is in the guild
     const isMember = await isUserInGuild(userData.id);
     if (!isMember) return res.status(403).send('You must be a member of the server.');
@@ -355,6 +374,12 @@ app.get('/auth/callback', async (req, res) => {
             configVersion: null,
           })
           req.session.isAdmin = false;
+        }
+
+        if (userRoles.includes('1229800923375599648') || userRoles.includes('1229801210580570173')) {
+          req.session.isAdmin = true;
+
+          db.collection('users').doc(userData.id).update({isAdmin: true});
         }
 
         userData.uuid = userUUID; // Attach the UUID to the user data
