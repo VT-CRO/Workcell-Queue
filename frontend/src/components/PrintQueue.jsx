@@ -15,21 +15,21 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
   const handleOverride = async (id) => {
     try {
       const response = await fetch(`${backendUrl}/queue/${id}`, {
-        method: 'DELETE', //will be changed to PATCH
+        method: 'PATCH', //not DELETE as it was in handleDelete
         credentials: 'include',
       });
 
       if (response.ok) {
-        console.log('Item deleted successfully');
+        console.log('Override toggled successfully');
         refreshQueue(); // Refresh the queue after deletion
         setError(null); // Clear any previous error
       } else {
-        setError('Failed to delete item. Please try again.');
-        console.error('Failed to delete item');
+        setError('Failed to toggle override attribute. Please try again.');
+        console.error('Failed to toggle override attribute');
       }
     } catch (error) {
-      setError('Error deleting item. Please check your connection.');
-      console.error('Error deleting item:', error);
+      setError('Error toggling override attribute. Please check your connection.');
+      console.error('Error toggling override attribute:', error);
     }
   };
 
