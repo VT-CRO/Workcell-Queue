@@ -36,7 +36,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.13 - Aurora"
+const VERSION = "1.1.14 - Aurora"
 const CONFIG_VERSION = "1.0.0"
 let ONLINE = false;
 
