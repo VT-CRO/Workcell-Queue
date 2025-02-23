@@ -267,7 +267,7 @@ app.use(cors({
     else callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
+  methods: ['GET', 'POST', 'OPTIONS', 'DELETE', 'PATCH'],
 }));
 app.options('*', cors());
 app.use(express.json());
@@ -492,6 +492,7 @@ app.post(
         uploader: uploader, // Use the nickname or username
         originalUploader: userData.id,
         uploadedAt: new Date(),
+        override: false, //override is false by default
       };
 
       await db
@@ -737,7 +738,8 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
       originalFilename: file.originalname,
       uploader: uploader, // Use the nickname or username
       originalUploader: userData.id,
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
+      override: false, //override is false by default
     };
 
     await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
@@ -778,6 +780,39 @@ app.get('/queue', async (req, res) => {
 
   res.json(docs);
 })
+
+// Toggle queue item Override
+app.patch('/queue/:id', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
+
+
+  const { id } = req.params;
+
+  // Find the item in the queue
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const index = queueItemSearch.docs[0].data();
+
+  console.log(index);
+
+
+
+
+  if (index === -1) return res.status(404).json({ message: 'Item not found' });
+
+  // Check if the current user is the uploader
+  if (index.originalUploader !== req.session.user.id) {
+    return res.status(403).json({ message: 'You are not authorized' });
+  }
+
+  const filePath = path.join(__dirname, 'uploads', index.filename);
+
+  // Toggle override
+  index.override = !(index.override);
+  db.collection('queue').doc(queueItemSearch.docs[0].id).update({override: index.override});
+  
+});
+
+
 
 // Delete queue item
 app.delete('/queue/:id', async (req, res) => {
