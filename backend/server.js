@@ -95,7 +95,7 @@ const fetchDiscordUser = async (token) => {
 };
 
 // Helper function to fetch Discord user roles
-const fetchUserRoles = async (token, userId) => {
+const fetchUserRoles = async (userId) => {
   const response = await fetch(`${DISCORD_API_URL}/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`, {
     method: 'GET',
     headers: {
@@ -337,7 +337,7 @@ app.get('/auth/callback', async (req, res) => {
     const tokenData = await tokenResponse.json();
     const userData = await fetchDiscordUser(tokenData.access_token);
 
-    const userRoles = await fetchUserRoles(tokenData.access_token, userData.id)
+    const userRoles = await fetchUserRoles(userData.id)
     console.log(userRoles);
     
 
