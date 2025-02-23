@@ -10,8 +10,8 @@ import ToggleOverride from './ToggleOverride';
 const PrintQueue = ({ queue, refreshQueue, user }) => {
   const backendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000';
   const [error, setError] = useState(null); // State for error messages
-  
 
+  
   const handleOverride = async (id) => {
     try {
       const response = await fetch(`${backendUrl}/queue/${id}`, {
@@ -90,7 +90,17 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                   )}
 
                   {/* SliderToggle Override */}      
-                  <ToggleOverride qItemId={item.id}/>
+                  
+                  
+                  <button 
+                    onClick={() => handleOverride(item.id) } //; handleOverride(qItemId)
+                       
+                    className="text-black-500 hover:text-black-700 ml-6"
+                    aria-label="Override"
+                  >
+                    <ToggleOverride/>
+                  </button>
+      
                          
                   
                   
