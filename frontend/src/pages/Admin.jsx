@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import UserCard from '../components/UserCard.jsx';
 
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = import.meta.env.VITE_FRONTEND_URL;
 
 const Admin = () => {
   const [Admin, setAdmin] = useState(null);
