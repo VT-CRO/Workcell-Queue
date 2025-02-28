@@ -808,6 +808,7 @@ app.get('/queue', async (req, res) => {
 
 // Toggle queue item Override
 app.patch('/queue/:id', async (req, res) => {
+  console.log(req);
   if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
 
