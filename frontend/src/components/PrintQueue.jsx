@@ -90,17 +90,16 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                   )}
 
                   {/* SliderToggle Override */}      
-                  
-                  
-                  <button 
-                    onClick={() => handleOverride(item.id) } //; handleOverride(qItemId)
+                  {(item.uploader === user.username || item.uploader === user.nickname) && (            
+                    <button 
+                      onClick={() => handleOverride(item.id) } //; handleOverride(qItemId)
                        
-                    className="text-black-500 hover:text-black-700 ml-6"
-                    aria-label="Override"
-                  >
-                    <ToggleOverride/>
+                      className="text-black-500 hover:text-black-700 ml-6"
+                      aria-label="Override"
+                    >
+                      <ToggleOverride/>
                   </button>
-      
+                  )}
                          
                   
                   
