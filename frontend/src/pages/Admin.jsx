@@ -6,7 +6,7 @@ const backendUrl = import.meta.env.VITE_FRONTEND_URL;
 
 const Admin = () => {
   const [Admin, setAdmin] = useState(null);
-  const [Users, setUsers] = useState([]);
+  const [Stats, setStats] = useState(null);
   const [Error, setError] = useState(null);
 
   useEffect(() => {
@@ -30,19 +30,55 @@ const Admin = () => {
         console.error(err);
         setError('An error occurred while fetching user data.');
       });
+
+    fetch(`${backendUrl}/users/statistics`, { credentials: 'include' })
+      .then((res) => {
+        return res.json();
+      })
+      .then((data) => {
+        setStats(data);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError('An error occurred while fetching user data.');
+      });
   }, []);
 
 
   return (
-    <>
-      {Admin ? <> {Admin.map((Admin) => (
-        <div key={Admin.id}>
-        <UserCard user={Admin} />
-        </div>
-      ))} </> 
-      : 
-      <>You must be an admin to access this page</>}
-    </>
+    <div className="p-6 space-y-6">
+
+      {Admin ? <>      
+      {/* Stats Display */}
+        {(Stats &&
+          <div className="flex justify-center items-center">
+          <div className="bg-white shadow-md rounded-lg p-4 border border-gray-200 flex space-x-6 items-center">
+              <div className="flex flex-col items-center">
+                  <span className="text-2xl font-bold text-blue-600">{Stats.totalItemsInQueue}</span>
+                  <span className="text-gray-600">Total Items in Queue</span>
+              </div>
+              <div className="flex flex-col items-center">
+                  <span className="text-2xl font-bold text-green-600">{Stats.totalPrints}</span>
+                  <span className="text-gray-600">Total Prints</span>
+              </div>
+              <div className="flex flex-col items-center">
+                  <span className="text-2xl font-bold text-purple-600">5 (Fake number)</span>
+                  <span className="text-gray-600">Prints Queued Today</span>
+              </div>
+          </div>
+      </div>
+      
+        )}
+
+        {/* User Cards */}
+
+        {Admin.map((admin) => (
+          <UserCard key={admin.id} user={admin} />
+        ))} </>
+        :
+        <>You must be an admin to access this page</>}
+
+    </div>
   );
 };
 
