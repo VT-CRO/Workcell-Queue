@@ -18,7 +18,6 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
         method: 'PATCH', //not DELETE as it was in handleDelete
         credentials: 'include',
       });
-      console.log(response);
 
       if (response.ok) {
         console.log('Override toggled successfully');
