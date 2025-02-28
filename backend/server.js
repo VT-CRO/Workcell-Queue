@@ -823,11 +823,6 @@ app.patch('/queue/:id', async (req, res) => {
   const queueItemSearch = await db.collection('queue').where("id", "==", id).get();
   const index = queueItemSearch.docs[0].data();
 
-  console.log(index);
-
-
-
-
   if (index === -1) return res.status(404).json({ message: 'Item not found' });
 
   // Check if the current user is the uploader
