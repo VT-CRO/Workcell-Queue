@@ -808,7 +808,6 @@ app.get('/queue', async (req, res) => {
 
 // Toggle queue item Override
 app.patch('/queue/:id', async (req, res) => {
-  console.log(req);
   if (!req.session.user) return res.status(401).json({ message: 'Unauthorized' });
 
 
@@ -817,11 +816,6 @@ app.patch('/queue/:id', async (req, res) => {
   // Find the item in the queue
   const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
   const index = queueItemSearch.docs[0].data();
-
-  console.log(index);
-
-
-
 
   if (index === -1) return res.status(404).json({ message: 'Item not found' });
 
