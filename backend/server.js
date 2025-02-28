@@ -111,7 +111,13 @@ const fetchUserRoles = async (userId) => {
 // extracts thumbnail from print file 
 function extractThumbnail(filePath) {
   try {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const fileContent = null;
+    try {
+      fileContent = fs.readFileSync(filePath, 'utf-8');
+    }
+    catch {
+      return null;
+    }
     const lines = fileContent.split('\n');
     let isThumbnail = false;
     let base64Data = '';
@@ -339,7 +345,7 @@ app.get('/auth/callback', async (req, res) => {
 
     const userRoles = await fetchUserRoles(userData.id)
     console.log(userRoles);
-    
+
 
 
     // Verify user is in the guild
@@ -379,13 +385,13 @@ app.get('/auth/callback', async (req, res) => {
         if (userRoles.includes('1229800923375599648') || userRoles.includes('1229801210580570173')) {
           req.session.isAdmin = true;
 
-          db.collection('users').doc(userData.id).update({isAdmin: true});
+          db.collection('users').doc(userData.id).update({ isAdmin: true });
         }
 
         userData.uuid = userUUID; // Attach the UUID to the user data
 
         req.session.user = userData;
- 
+
         // Redirect with the UUID (you could also provide it in the frontend)
         res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
       })
@@ -404,9 +410,9 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/queue/:id/thumbnail', async (req, res) => {
   const { id } = req.params;
 
-  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();
   const queueItem = queueItemSearch.docs[0].data();
-  
+
 
   if (!queueItem) {
     return res.status(404).json({ message: 'File not found in the queue' });
@@ -612,7 +618,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
   const { uuid } = req.params;
 
   // fix this TODO
-  
+
   let user = null;
   let userDocRef = null;
   const docRef = db.collection("users");
@@ -634,26 +640,26 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
       if (!fs.existsSync(ORIGINAL_ORCA_PRINTER)) {
         return res.status(400).json({ message: `Original file '${ORIGINAL_ORCA_PRINTER}' not found.` });
       }
-    
+
       // Prepare paths for processing
       const userExtractPath = path.join(EXTRACT_PATH, uuid);
       const outputOrcaPrinter = path.join(OUTPUT_ORCA_PRINTER_DIR, `${uuid}.orca_printer`);
-    
+
       // Clean up previous data
       if (fs.existsSync(userExtractPath)) fs.rmSync(userExtractPath, { recursive: true, force: true });
       if (fs.existsSync(outputOrcaPrinter)) fs.unlinkSync(outputOrcaPrinter);
-    
+
       try {
         // Step 1: Extract the original `.orca_printer` file
         extractOrcaPrinter(ORIGINAL_ORCA_PRINTER, userExtractPath);
-    
+
         // Step 2: Edit the JSON file
         const jsonFileToEdit = path.join(userExtractPath, 'printer', `${MACHINE_NAME}.json`);
         if (!fs.existsSync(jsonFileToEdit)) {
           return res.status(400).json({ message: `JSON file '${jsonFileToEdit}' not found.` });
         }
         editJsonFile(jsonFileToEdit, discordUser.id, uuid);
-    
+
         // Step 3: Edit the Filament file
         // const filamentPath = path.join(userExtractPath, 'filament');
         // const files = fs.readdirSync(filamentPath).filter(file => file.endsWith('.json'));
@@ -661,7 +667,7 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
         //   const jsonFileToEdit = path.join(filamentPath, file);
         //   editFilament(jsonFileToEdit);
         // });
-    
+
         // Step 4: Edit the Print file
         const printPath = path.join(userExtractPath, 'process');
         const printFiles = fs.readdirSync(printPath).filter(file => file.endsWith('.json'));
@@ -669,10 +675,10 @@ app.get('/:uuid/api/download', verifyGuildMembershipByUUID, (req, res) => {
           const jsonFileToEdit = path.join(printPath, file);
           editPrint(jsonFileToEdit);
         });
-    
+
         // Step 3: Repackage the modified `.orca_printer` file
         repackageOrcaPrinter(userExtractPath, outputOrcaPrinter);
-    
+
         // Step 4: Serve the modified file
         userDocRef.update({
           configVersion: CONFIG_VERSION
@@ -771,7 +777,7 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
 
     // increase print total by one
     const docRef = db.collection('users').doc(userData.id);
-    
+
     docRef.update({
       totalPrintsQueued: admin.firestore.FieldValue.increment(1)
     })
@@ -814,7 +820,7 @@ app.patch('/queue/:id', async (req, res) => {
   const { id } = req.params;
 
   // Find the item in the queue
-  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();
   const index = queueItemSearch.docs[0].data();
 
   if (index === -1) return res.status(404).json({ message: 'Item not found' });
@@ -828,8 +834,8 @@ app.patch('/queue/:id', async (req, res) => {
 
   // Toggle override
   index.override = !(index.override);
-  db.collection('queue').doc(queueItemSearch.docs[0].id).update({override: index.override});
-  
+  db.collection('queue').doc(queueItemSearch.docs[0].id).update({ override: index.override });
+
 });
 
 
@@ -842,7 +848,7 @@ app.delete('/queue/:id', async (req, res) => {
   const { id } = req.params;
 
   // Find the item in the queue
-  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();   
+  const queueItemSearch = await db.collection('queue').where("id", "==", id).get();
   const index = queueItemSearch.docs[0].data();
 
 
@@ -978,13 +984,13 @@ app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
 // app.use((req, res) => res.status(404).send('Route not found'));
 
 // const verifyAdminStatus = async (req, res) => {
-  
+
 //   next();  
 // }
 
 app.get(`/users`, async (req, res) => {
 
-  const user = await db.collection("users").doc(req.session.user.id).get(); 
+  const user = await db.collection("users").doc(req.session.user.id).get();
   req.session.isAdmin = user.get("isAdmin");
 
   if (!req.session.isAdmin) return res.status(401).send('Unauthorized');
@@ -1003,6 +1009,27 @@ app.get(`/users`, async (req, res) => {
   res.send(docs);
 
 });
+
+app.get('/users/statistics', async (req, res) => {
+
+  if (!req.session.isAdmin) return res.status(401).send('Unauthorized');
+
+  const queue = await db.collection("queue").get();
+
+  let totalItemsInQueue = 0;
+  queue.forEach(doc => {
+    totalItemsInQueue = totalItemsInQueue + 1;
+  })
+
+  const users = await db.collection("users").get();
+  let totalPrints = 0;
+  users.forEach(doc => {
+    totalPrints += doc.data().totalPrintsQueued;
+  })
+
+  res.json({ totalItemsInQueue: totalItemsInQueue, totalPrints: totalPrints });
+});
+
 
 
 // Log all requests
