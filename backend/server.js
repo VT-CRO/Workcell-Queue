@@ -111,7 +111,7 @@ const fetchUserRoles = async (userId) => {
 // extracts thumbnail from print file 
 function extractThumbnail(filePath) {
   try {
-    const fileContent = null;
+    let fileContent = null;  // Changed from const to let
     try {
       fileContent = fs.readFileSync(filePath, 'utf-8');
     }
@@ -142,6 +142,7 @@ function extractThumbnail(filePath) {
     return null;
   }
 }
+
 
 // Helper function to check if a user is in the server
 async function isUserInGuild(userId) {
@@ -584,6 +585,7 @@ const editJsonFile = (filePath, authorName, id) => {
   }
 
   data.print_host = `${PRINTER_HOST}/${id}`;
+  data.thumbnail_size = "300x300";
   data.default_filament_profile = DEFAULT_FILAMENT;
   data.default_print_profile = DEFAULT_PROCESS;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
