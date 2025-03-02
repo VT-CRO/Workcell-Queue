@@ -79,14 +79,16 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                   </span>
 
                   {/* Trash can icon */}
-                  {(item.uploader === user.username || item.uploader === user.nickname) && (
+                  {console.log(user)}
+                  
+                  {(item.uploader === user.username || item.uploader === user.nickname || user.isAdmin === true) && (
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="text-red-500 hover:text-red-700 ml-2"
                       aria-label="Delete"
                     >
                       <FaTrash />
-                    </button>
+                    </button>                    
                   )}
 
                   {/* SliderToggle Override */}      
