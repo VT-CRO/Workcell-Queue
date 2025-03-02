@@ -51,6 +51,10 @@ const Header = () => {
     navigate('/admin');
   }
 
+  const handleDashboard = () => {
+    navigate('/dashboard');
+  }
+
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
   const getAvatarUrl = (user, guildAvatar) => {
@@ -100,6 +104,12 @@ const Header = () => {
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                  <button
+                    onClick={handleDashboard}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                    >
+                      Dashboard
+                    </button>
                   <button
                     onClick={handleAdmin}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-100"

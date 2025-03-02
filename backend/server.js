@@ -36,7 +36,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.1.14 - Aurora"
+const VERSION = "1.2.0 - Victoria"
 const CONFIG_VERSION = "1.0.0"
 let ONLINE = false;
 
@@ -713,6 +713,7 @@ app.get('/dashboard', verifyGuildMembership, async (req, res) => {
       username: userData.username,
       uuid: userData.uuid,
       avatar: userData.avatar,
+      isAdmin: userData.isAdmin,
       id: userData.id,
       discriminator: userData.discriminator,
       nickname: userData.nickname || null, // Include the server-specific nickname
@@ -856,7 +857,7 @@ app.delete('/queue/:id', async (req, res) => {
   if (index === -1) return res.status(404).json({ message: 'Item not found' });
 
   // Check if the current user is the uploader
-  if (index.originalUploader !== req.session.user.id) {
+  if (index.originalUploader !== req.session.user.id && req.session.user.isAdmin == false) {
     return res.status(403).json({ message: 'You are not authorized to delete this file' });
   }
 
@@ -1027,7 +1028,25 @@ app.get('/users/statistics', async (req, res) => {
     totalPrints += doc.data().totalPrintsQueued;
   })
 
-  res.json({ totalItemsInQueue: totalItemsInQueue, totalPrints: totalPrints });
+  // Get the start and end of today as Firestore Timestamps
+  const todayStart = admin.firestore.Timestamp.fromDate(new Date(new Date().setHours(0, 0, 0, 0))); // Start of today
+  const todayEnd = admin.firestore.Timestamp.fromDate(new Date(new Date().setHours(23, 59, 59, 999))); // End of today
+
+  const today = await db.collection("queue")
+    .where('uploadedAt', '>=', todayStart)
+    .where('uploadedAt', '<=', todayEnd)
+    .get();
+
+  console.log("TOday:" + today);
+
+  let todayItems = 0;
+  today.forEach(doc => {
+    console.log("Data:" + doc.data());
+    todayItems = todayItems + 1;
+  })
+
+
+  res.json({ totalItemsInQueue: totalItemsInQueue, totalPrints: totalPrints, todayItems: todayItems });
 });
 
 
