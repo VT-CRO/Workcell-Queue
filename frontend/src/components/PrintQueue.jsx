@@ -78,9 +78,7 @@ const PrintQueue = ({ queue, refreshQueue, user }) => {
                     {item.originalFilename}
                   </span>
 
-                  {/* Trash can icon */}
-                  {console.log(user)}
-                  
+                  {/* Trash can icon */}                  
                   {(item.uploader === user.username || item.uploader === user.nickname || user.isAdmin === true) && (
                     <button
                       onClick={() => handleDelete(item.id)}
