@@ -383,7 +383,7 @@ app.get('/auth/callback', async (req, res) => {
           req.session.isAdmin = false;
         }
 
-        if (userRoles.includes('1229800923375599648') || userRoles.includes('1229801210580570173')) {
+        if (userRoles.includes('1049019127823597609') || userRoles.includes('1229801210580570173')) { // exec || cheif engineer
           req.session.isAdmin = true;
 
           db.collection('users').doc(userData.id).update({ isAdmin: true });
