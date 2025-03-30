@@ -62,8 +62,8 @@ const Admin = () => {
                   <span className="text-gray-600">Total Prints</span>
               </div>
               <div className="flex flex-col items-center">
-                  <span className="text-2xl font-bold text-purple-600">{Stats.todayItems}</span>
-                  <span className="text-gray-600">Prints Queued Today</span>
+                  <span className="text-2xl font-bold text-purple-600">{Stats.totalWeight}</span>
+                  <span className="text-gray-600">Total weight of prints (g)</span>
               </div>
           </div>
       </div>
