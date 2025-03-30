@@ -36,7 +36,7 @@ const OUTPUT_ORCA_PRINTER_DIR = path.join(__dirname, 'outputs');
 const PRINTER_HOST = `${process.env.FRONTEND_URL}/api`;
 const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
-const VERSION = "1.2.0 - Victoria"
+const VERSION = "1.2.1 - Victoria"
 const CONFIG_VERSION = "1.0.0"
 let ONLINE = false;
 
@@ -143,6 +143,29 @@ function extractThumbnail(filePath) {
   }
 }
 
+// extracts thumbnail from print file 
+function extractWeight(fileContent) {
+  try {
+
+    const lines = fileContent.split('\n');
+    let base64Data = '';
+
+    lines.forEach((line) => {
+      if (line.includes('; total filament weight [g] : ')) {
+        base64Data += line.trim().substring(30); // Remove leading `; `
+      }
+    });
+
+    if (!base64Data) {
+      return null; // No data found
+    }
+  
+    return base64Data;
+  } catch (error) {
+    console.error('Error extracting thumbnail:', error);
+    return null;
+  }
+}
 
 // Helper function to check if a user is in the server
 async function isUserInGuild(userId) {
@@ -490,6 +513,9 @@ app.post(
         (line) => line.trim() === `; VERSION: ${CONFIG_VERSION}`
       );
 
+      const weightData = extractWeight(fileContent);
+
+
       if (!validVersionFound) {
         await sf.unlink(file.path);
         return res.status(400).json({
@@ -537,6 +563,9 @@ app.post(
       await docRef.update({
         totalPrintsQueued: admin.firestore.FieldValue.increment(1),
       });
+
+      docRef = db.collection('stats').doc('weight');
+      docRef.update({ total: admin.firestore.FieldValue.increment(Number(weightData)) });
 
       res
         .status(200)
@@ -746,6 +775,9 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
       (line) => line.trim() === `; VERSION: ${CONFIG_VERSION}`
     );
 
+    //console.log("file content" + fileContent.split('\n').slice(0, 600));
+    const weightData = extractWeight(fileContent);
+
     if (!validVersionFound) {
       await sf.unlink(file.path);
       return res.status(400).json({
@@ -779,11 +811,14 @@ app.post('/upload', verifyGuildMembership, upload.single('gcode'), async (req, r
     await db.collection('queue').doc(queueItem.uploadedAt.toISOString()).set(queueItem, { merge: true });
 
     // increase print total by one
-    const docRef = db.collection('users').doc(userData.id);
+    let docRef = db.collection('users').doc(userData.id);
 
     docRef.update({
       totalPrintsQueued: admin.firestore.FieldValue.increment(1)
-    })
+    });
+
+    docRef = db.collection('stats').doc('weight');
+    docRef.update({ total: admin.firestore.FieldValue.increment(Number(weightData)) });
 
     res.status(200).json({ message: 'File uploaded successfully', queueItem });
   } catch (error) {
@@ -1039,16 +1074,19 @@ app.get('/users/statistics', async (req, res) => {
     .where('uploadedAt', '<=', todayEnd)
     .get();
 
-  console.log("TOday:" + today);
 
   let todayItems = 0;
   today.forEach(doc => {
-    console.log("Data:" + doc.data());
     todayItems = todayItems + 1;
   })
 
+  const weight = await db.collection("stats")
+    .doc("weight")
+    .get();
 
-  res.json({ totalItemsInQueue: totalItemsInQueue, totalPrints: totalPrints, todayItems: todayItems });
+  let totalWeight = weight.data().total;
+
+  res.json({ totalItemsInQueue: totalItemsInQueue, totalPrints: totalPrints, todayItems: todayItems, totalWeight: totalWeight });
 });
 
 
