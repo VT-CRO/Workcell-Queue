@@ -143,7 +143,7 @@ function extractThumbnail(filePath) {
   }
 }
 
-// extracts thumbnail from print file 
+// extracts weight from print file 
 function extractWeight(fileContent) {
   try {
 
