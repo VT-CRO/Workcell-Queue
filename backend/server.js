@@ -564,8 +564,8 @@ app.post(
         totalPrintsQueued: admin.firestore.FieldValue.increment(1),
       });
 
-      docRef = db.collection('stats').doc('weight');
-      docRef.update({ total: admin.firestore.FieldValue.increment(Number(weightData)) });
+      const newDocRef = db.collection('stats').doc('weight');
+      await newDocRef.update({ total: admin.firestore.FieldValue.increment(Number(weightData)) });
 
       res
         .status(200)
