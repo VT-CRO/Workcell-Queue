@@ -38,7 +38,7 @@ const DEFAULT_FILAMENT = "CRO PLA"
 const DEFAULT_PROCESS = "0.20 Standard"
 const VERSION = "1.2.1 - Victoria"
 const CONFIG_VERSION = "1.0.0"
-let ONLINE = false;
+let ONLINE = true;
 
 // Load or generate a UUID for the bot
 const botUuidFilePath = path.join(__dirname, 'botUuid.json');
