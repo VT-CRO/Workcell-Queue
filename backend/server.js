@@ -1018,6 +1018,12 @@ app.get(`/${botUuid}/queuetoggle`, async (req, res) => {
   res.status(200).send(`Queue Toggled: ${ONLINE ? 'Online' : 'Offline'}`);
 });
 
+app.get(`/user/queuetoggle`, async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  ONLINE = !ONLINE;
+  res.status(200).send(`Queue Toggled: ${ONLINE ? 'Online' : 'Offline'}`);
+})
+
 // // Handle 404 errors
 // app.use((req, res) => res.status(404).send('Route not found'));
 
